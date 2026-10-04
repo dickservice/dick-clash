@@ -1,7 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/common/dick_service_api.dart';
 import 'package:fl_clash/common/dick_service_models.dart';
+import 'package:fl_clash/common/preferences.dart';
+import 'package:fl_clash/common/dick_service_profile.dart';
+import 'package:fl_clash/common/print.dart';
 import '_common.dart';
+import 'payment_webview.dart';
 
 class DickServiceShopPage extends StatefulWidget {
   const DickServiceShopPage({super.key});
@@ -73,15 +77,20 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
           padding: const EdgeInsets.all(16),
           itemCount: plans.length,
           itemBuilder: (_, i) =>
-              _PlanCard(plan: plans[i], onBuy: () => _unsupported('创建订单并打开支付')),
+              _PlanCard(plan: plans[i], onBuy: () => _openPurchase(plans[i])),
         );
       },
     ),
   );
 
-  void _unsupported(String action) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text('$action暂不可用：登录和支付请求体仍需动态捕获')));
+  Future<void> _openPurchase(DickServicePlan plan) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          _PurchaseSheet(api: _api, plan: plan, paymentContext: context),
+    );
+  }
 }
 
 class _PlanCard extends StatelessWidget {
@@ -128,6 +137,137 @@ class _PlanCard extends StatelessWidget {
           label: const Text('创建订单并打开支付'),
         ),
       ],
+    ),
+  );
+}
+
+class _PurchaseSheet extends StatefulWidget {
+  const _PurchaseSheet({
+    required this.api,
+    required this.plan,
+    required this.paymentContext,
+  });
+  final DickServiceApi api;
+  final DickServicePlan plan;
+  final BuildContext paymentContext;
+
+  @override
+  State<_PurchaseSheet> createState() => _PurchaseSheetState();
+}
+
+class _PurchaseSheetState extends State<_PurchaseSheet> {
+  final _coupon = TextEditingController();
+  late DickServicePriceOption _price = widget.plan.priceOptions.first;
+  int _method = 1;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _coupon.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final period = _price.period;
+    if (period == null || period.isEmpty) {
+      setState(() => _error = '购买周期不可用');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      final token = prefs?.getString(kDickServiceAuthDataKey);
+      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
+      final coupon = _coupon.text.trim();
+      final order = await widget.api.createOrder(
+        token,
+        period,
+        widget.plan.id,
+        couponCode: coupon.isEmpty ? null : coupon,
+      );
+      if (order.tradeNo.isEmpty) throw StateError('订单号返回为空');
+      final checkout = await widget.api.checkoutOrder(
+        token,
+        order.tradeNo,
+        _method,
+      );
+      if (!mounted) return;
+      final paymentContext = widget.paymentContext;
+      if (!paymentContext.mounted) return;
+      Navigator.of(context).pop();
+      await openDickServicePaymentPage(
+        paymentContext,
+        checkout: checkout,
+        tradeNo: order.tradeNo,
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = compactError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(widget.plan.name, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<DickServicePriceOption>(
+            initialValue: _price,
+            decoration: const InputDecoration(labelText: '购买周期'),
+            items: [
+              for (final price in widget.plan.priceOptions)
+                DropdownMenuItem(
+                  value: price,
+                  child: Text(
+                    '${price.period ?? '--'} · ${price.formattedPrice}',
+                  ),
+                ),
+            ],
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _price = value!),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            initialValue: _method,
+            decoration: const InputDecoration(labelText: '支付方式'),
+            items: const [
+              DropdownMenuItem(value: 1, child: Text('支付宝')),
+              DropdownMenuItem(value: 2, child: Text('微信')),
+              DropdownMenuItem(value: 3, child: Text('USDT')),
+            ],
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _method = value!),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _coupon,
+            decoration: const InputDecoration(labelText: '优惠码（可选）'),
+          ),
+          if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _busy ? null : _submit,
+            icon: const Icon(Icons.shopping_cart_checkout),
+            label: Text(_busy ? '处理中...' : '创建订单并打开支付'),
+          ),
+        ],
+      ),
     ),
   );
 }

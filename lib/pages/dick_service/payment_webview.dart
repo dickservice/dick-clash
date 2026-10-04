@@ -1,34 +1,98 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:fl_clash/common/dick_service_models.dart';
+import 'package:fl_clash/common/dialog.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '_common.dart';
 
-/// Payment WebView is intentionally not implemented: AOT shows a WebView
-/// contract, but the fork has no validated WebView dependency or policy.
-class DickServicePaymentWebViewPage extends StatelessWidget {
+class DickServicePaymentWebViewPage extends StatefulWidget {
   const DickServicePaymentWebViewPage({
     super.key,
-    required this.url,
+    required this.checkout,
     this.tradeNo,
   });
-  final String url;
+  final DickServiceCheckout checkout;
   final String? tradeNo;
 
   @override
-  Widget build(BuildContext context) => DickServiceScaffold(
-    title: '订单支付',
-    body: DickServiceStateView(
-      icon: Icons.payment_outlined,
-      title: '支付页面暂不可用',
-      detail: '订单号：${tradeNo ?? '--'}\n支付 WebView 合同仍需动态捕获，未加载未经验证的地址。',
+  State<DickServicePaymentWebViewPage> createState() =>
+      _DickServicePaymentWebViewPageState();
+}
+
+class _DickServicePaymentWebViewPageState
+    extends State<DickServicePaymentWebViewPage> {
+  late final WebViewController _controller;
+  bool _canGoBack = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (request) {
+            final uri = Uri.tryParse(request.url);
+            if (uri == null) return NavigationDecision.prevent;
+            if (uri.scheme == 'http' || uri.scheme == 'https') {
+              return NavigationDecision.navigate;
+            }
+            dialogs.openUrl(request.url);
+            return NavigationDecision.prevent;
+          },
+          onPageFinished: (_) => _updateCanGoBack(),
+        ),
+      );
+    final html = widget.checkout.html;
+    if (html != null && html.isNotEmpty) {
+      _controller.loadHtmlString(html);
+    } else {
+      _controller.loadRequest(Uri.parse(widget.checkout.url!));
+    }
+  }
+
+  Future<void> _updateCanGoBack() async {
+    final value = await _controller.canGoBack();
+    if (mounted) setState(() => _canGoBack = value);
+  }
+
+  Future<bool> _onPop() async {
+    if (await _controller.canGoBack()) {
+      await _controller.goBack();
+      await _updateCanGoBack();
+      return false;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_canGoBack,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _onPop();
+    },
+    child: DickServiceScaffold(
+      title: '订单支付',
+      actions: [
+        IconButton(
+          onPressed: _controller.reload,
+          tooltip: '刷新',
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      body: WebViewWidget(controller: _controller),
     ),
   );
 }
 
 Future<void> openDickServicePaymentPage(
   BuildContext context, {
-  required String url,
+  required DickServiceCheckout checkout,
   String? tradeNo,
 }) async {
-  throw UnimplementedError(
-    'payment WebView contract not verified from static AOT - needs dynamic capture',
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) =>
+          DickServicePaymentWebViewPage(checkout: checkout, tradeNo: tradeNo),
+    ),
   );
 }

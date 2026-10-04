@@ -45,6 +45,7 @@ dependencies:
   animations: ^3.0.0
   package_info_plus: ^10.2.1
   url_launcher: ^6.3.2
+  webview_flutter: ^4.14.0
   freezed_annotation: ^3.1.0
   image_picker: ^1.2.0
   ffi: ^2.1.4

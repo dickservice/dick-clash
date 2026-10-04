@@ -1,19 +1,24 @@
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import '_common.dart';
 
-class DickServiceLoginPage extends StatefulWidget {
+class DickServiceLoginPage extends ConsumerStatefulWidget {
   const DickServiceLoginPage({super.key, this.onComplete});
 
   final VoidCallback? onComplete;
 
   @override
-  State<DickServiceLoginPage> createState() => _DickServiceLoginPageState();
+  ConsumerState<DickServiceLoginPage> createState() =>
+      _DickServiceLoginPageState();
 }
 
-class _DickServiceLoginPageState extends State<DickServiceLoginPage> {
+class _DickServiceLoginPageState extends ConsumerState<DickServiceLoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -24,18 +29,44 @@ class _DickServiceLoginPageState extends State<DickServiceLoginPage> {
 
   Future<void> _submit() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = '请输入账号和密码');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final api = DickServiceApi();
     try {
-      throw UnimplementedError(
-        'login body not verified from static AOT - needs dynamic capture',
+      final session = await api.login(email, password);
+      final subscribe = await api.fetchSubscribe(session.token);
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      if (prefs == null) throw StateError('本地存储不可用');
+      await prefs.setBool(DickServiceExpiryCacheStore.kBootstrapDone, true);
+      await prefs.setString(kDickServiceAuthDataKey, session.token);
+      await DickServiceExpiryCacheStore(prefs).saveSubscribe(
+        DickServiceSubscribeCompat(
+          planName: subscribe.planName,
+          hasActivePlan: subscribe.hasActivePlan,
+          expiredAtMs: subscribe.normalizedExpiredAt(),
+          isExpired: subscribe.isExpired(),
+        ),
       );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('登录暂不可用：$error')));
+      if (subscribe.isTimeBasedExpired()) {
+        if (mounted) setState(() => _error = '您的套餐已到期，请先续费后再使用');
+        return;
       }
+      await ref
+          .read(profilesActionProvider.notifier)
+          .addDickServiceBoundProfile();
+      widget.onComplete?.call();
+    } catch (error) {
+      if (mounted) setState(() => _error = compactError(error));
     } finally {
+      api.dio.close();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -77,11 +108,13 @@ class _DickServiceLoginPageState extends State<DickServiceLoginPage> {
             icon: const Icon(Icons.login),
             label: Text(_busy ? '正在导入...' : '登录并导入订阅'),
           ),
-          const SizedBox(height: 12),
-          Text(
-            '登录契约仍需动态捕获，页面不会伪造成功或保存授权。',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
         ],
       ),
     );

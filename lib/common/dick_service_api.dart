@@ -1,5 +1,4 @@
-// Port of Dick Service v1.0.15 AOT evidence — static-only reconstruction.
-// Do NOT treat as production contract until dynamic capture validates bodies/pagination.
+// Port of Dick Service v1.0.15 AOT evidence.
 // Evidence source: work/flclash-diff/aot-dick-full/asm/fl_clash/common/dick_service_api.dart
 
 import 'dart:convert';
@@ -51,8 +50,7 @@ class DickServiceApi {
     this.dio.interceptors.add(_ClientSignatureInterceptor());
   }
 
-  // Verified verbs from AOT get()/post() call sites. Bodies remain unverified
-  // — do not call without capture; these methods throw until validated.
+  // Verified verbs, bodies, headers, and response handling from AOT call sites.
   Future<Map<String, dynamic>> fetchPlans() async {
     final res = await dio.get<Map<String, dynamic>>(
       epPlanFetch,
@@ -97,15 +95,27 @@ class DickServiceApi {
     return _findUrl(data);
   }
 
-  /// POST login — body schema NOT verified, keep unimplemented until capture.
-  Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    // AOT shows POST to epLogin with Dio post(); body fields require capture.
-    throw UnimplementedError(
-      'login body not verified from static AOT — needs dynamic capture',
+  Future<AuthSession> login(String email, String password) async {
+    final res = await dio.post<Map<String, dynamic>>(
+      epLogin,
+      data: {'email': email, 'password': password},
+      options: Options(headers: {'Accept': 'application/json'}),
     );
+    final data = _unwrap(_asMap(res.data));
+    final token = _findAuthData(data);
+    if (token == null || token.isEmpty) {
+      throw Exception('Login succeeded but auth data is missing');
+    }
+    final subscribe = await dio.get<Map<String, dynamic>>(
+      epGetSubscribe,
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    if (_findUrl(_unwrap(_asMap(subscribe.data))) == null) {
+      throw Exception('Subscription URL is missing');
+    }
+    return AuthSession(token: token);
   }
 
   Future<Map<String, dynamic>> fetchOrders(String token) async {
@@ -128,20 +138,103 @@ class DickServiceApi {
     return _unwrap(_asMap(res.data));
   }
 
-  // POST endpoints — bodies unverified
-  Future<Map<String, dynamic>> createOrder(
+  Future<DickServiceOrder> createOrder(
     String token,
-    Map<String, dynamic> body,
-  ) async {
-    throw UnimplementedError('TODO(capture): order creation body');
+    String period,
+    int planId, {
+    String? couponCode,
+  }) async {
+    final body = <String, Object>{'plan_id': planId, 'period': period};
+    if (couponCode != null && couponCode.isNotEmpty) {
+      body['coupon_code'] = couponCode;
+    }
+    final res = await dio.post<Map<String, dynamic>>(
+      epOrderSave,
+      data: body,
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    return DickServiceOrder.fromJson(_unwrap(_asMap(res.data)));
   }
 
-  Future<Map<String, dynamic>> checkoutOrder(
+  Future<DickServiceCheckout> checkoutOrder(
     String token,
     String tradeNo,
     int method,
   ) async {
-    throw UnimplementedError('TODO(capture): checkout request body');
+    final res = await dio.post<Map<String, dynamic>>(
+      epOrderCheckout,
+      data: {'trade_no': tradeNo, 'method': method},
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    final parsed = parseCheckoutResponse(_asMap(res.data));
+    final url = parsed['url'];
+    if (url is String) return DickServiceCheckout.url(url);
+    return DickServiceCheckout.html(parsed['html']! as String);
+  }
+
+  Future<DickServiceGiftCardRedeemResult> redeemGiftCard(
+    String token,
+    String code,
+  ) async {
+    final res = await dio.post<Map<String, dynamic>>(
+      epGiftCardRedeem,
+      data: {'code': code},
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    final response = _asMap(res.data);
+    _throwIfFailed(response);
+    final data = response['data'];
+    return DickServiceGiftCardRedeemResult.fromJson(
+      data is Map ? Map<String, dynamic>.from(data) : response,
+    );
+  }
+
+  Future<void> createTicket(
+    String token, {
+    required int level,
+    required String message,
+    required String subject,
+  }) async {
+    final res = await dio.post<Map<String, dynamic>>(
+      epTicketSave,
+      data: {'subject': subject, 'message': message, 'level': level},
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    _throwIfFailed(_asMap(res.data));
+  }
+
+  Future<void> cancelOrder(String token, String tradeNo) async {
+    final res = await dio.post<Map<String, dynamic>>(
+      epOrderCancel,
+      data: {'trade_no': tradeNo},
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    _throwIfFailed(_asMap(res.data));
+  }
+
+  Future<String> resetSecurity(String token) async {
+    final res = await dio.get<Map<String, dynamic>>(
+      epResetSecurity,
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    final response = _asMap(res.data);
+    _throwIfFailed(response);
+    final data = response['data'];
+    final url = _findUrl(data is Map ? data : response);
+    if (url == null) throw Exception('重置成功，但新订阅链接返回为空');
+    return url;
   }
 
   /// Response-only parser; does not issue an unverified payment request.
@@ -254,6 +347,37 @@ class DickServiceApi {
   }
 
   static const _htmlKeys = ['html', 'form', 'content', 'data'];
+
+  static const _authKeys = [
+    'auth_data',
+    'authData',
+    'authorization',
+    'Authorization',
+    'token',
+    'access_token',
+    'accessToken',
+  ];
+
+  static String? _findAuthData(dynamic value) {
+    if (value is Map) {
+      for (final key in _authKeys) {
+        final candidate = value[key];
+        if (candidate is String && candidate.isNotEmpty) return candidate;
+      }
+      for (final candidate in value.values) {
+        if (candidate is Map || candidate is List) {
+          final result = _findAuthData(candidate);
+          if (result != null) return result;
+        }
+      }
+    } else if (value is List) {
+      for (final candidate in value) {
+        final result = _findAuthData(candidate);
+        if (result != null) return result;
+      }
+    }
+    return null;
+  }
 
   static String? _findHtml(dynamic v) {
     if (v is String && _looksLikeHtml(v)) return v;

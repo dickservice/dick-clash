@@ -1,8 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:fl_clash/common/common.dart';
 import '_common.dart';
 
-/// The AOT page is backed by an unverified POST request. Keep the form useful
-/// for static replication without inventing a redeem contract or success.
 class DickServiceGiftCardPage extends StatefulWidget {
   const DickServiceGiftCardPage({super.key});
 
@@ -13,17 +12,49 @@ class DickServiceGiftCardPage extends StatefulWidget {
 
 class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
   final _code = TextEditingController();
+  final _api = DickServiceApi();
+  bool _busy = false;
+  String? _result;
 
   @override
   void dispose() {
     _code.dispose();
+    _api.dio.close();
     super.dispose();
   }
 
-  void _redeem() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('兑换暂不可用：请求体契约仍需动态捕获')));
+  Future<void> _redeem() async {
+    final code = _code.text.trim();
+    if (code.isEmpty) {
+      setState(() => _result = '请输入兑换码');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _result = null;
+    });
+    try {
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      final token = prefs?.getString(kDickServiceAuthDataKey);
+      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
+      final result = await _api.redeemGiftCard(token, code);
+      final subscribe = await _api.fetchSubscribe(token);
+      if (prefs != null) {
+        await DickServiceExpiryCacheStore(prefs).saveSubscribe(
+          DickServiceSubscribeCompat(
+            planName: subscribe.planName,
+            hasActivePlan: subscribe.hasActivePlan,
+            expiredAtMs: subscribe.normalizedExpiredAt(),
+            isExpired: subscribe.isExpired(),
+          ),
+        );
+      }
+      if (mounted) setState(() => _result = result.summary);
+    } catch (error) {
+      if (mounted) setState(() => _result = compactError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -46,10 +77,11 @@ class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _redeem,
+            onPressed: _busy ? null : _redeem,
             icon: const Icon(Icons.card_giftcard),
-            label: const Text('立即兑换'),
+            label: Text(_busy ? '兑换中...' : '立即兑换'),
           ),
+          if (_result != null) ...[const SizedBox(height: 12), Text(_result!)],
         ],
       ),
     );

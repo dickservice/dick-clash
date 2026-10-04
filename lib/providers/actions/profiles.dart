@@ -135,6 +135,26 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
+  Future<void> addDickServiceBoundProfile() async {
+    final existing = ref.read(profilesProvider).dickServiceBoundProfile;
+    if (existing != null) {
+      await updateProfile(existing, showLoading: true);
+      return;
+    }
+    if (globalState.navigatorKey.currentState?.canPop() ?? false) {
+      globalState.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    }
+    ref.read(currentPageLabelProvider.notifier).value = PageLabel.profiles;
+    final profile = await globalState.loadingRun(
+      tag: LoadingTag.profiles,
+      () => Profile.normal(
+        url: kDickServiceBoundSubscribeUrl,
+      ).update(validate: (path) => _core.validateConfig(path)),
+      title: currentAppLocalizations.addProfile,
+    );
+    if (profile != null) putProfile(profile);
+  }
+
   void setProfileAndAutoApply(Profile profile) {
     ref.read(profilesProvider.notifier).put(profile);
     if (profile.id == ref.read(currentProfileIdProvider)) {

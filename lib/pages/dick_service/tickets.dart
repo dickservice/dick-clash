@@ -4,6 +4,7 @@ import 'package:fl_clash/common/dick_service_models.dart';
 import '_common.dart';
 import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/common/dick_service_profile.dart';
+import 'package:fl_clash/common/print.dart';
 
 class DickServiceTicketsPage extends StatefulWidget {
   const DickServiceTicketsPage({super.key, this.token});
@@ -51,6 +52,11 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
     title: '工单',
     actions: [
       IconButton(
+        onPressed: _openCreate,
+        tooltip: '创建工单',
+        icon: const Icon(Icons.add),
+      ),
+      IconButton(
         onPressed: _reload,
         tooltip: '刷新',
         icon: const Icon(Icons.refresh),
@@ -95,6 +101,115 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
           ],
         );
       },
+    ),
+  );
+
+  Future<void> _openCreate() async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _CreateTicketSheet(api: _api, token: widget.token),
+    );
+    if (created == true && mounted) _reload();
+  }
+}
+
+class _CreateTicketSheet extends StatefulWidget {
+  const _CreateTicketSheet({required this.api, this.token});
+  final DickServiceApi api;
+  final String? token;
+
+  @override
+  State<_CreateTicketSheet> createState() => _CreateTicketSheetState();
+}
+
+class _CreateTicketSheetState extends State<_CreateTicketSheet> {
+  final _subject = TextEditingController();
+  final _message = TextEditingController();
+  int _level = 1;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final subject = _subject.text.trim();
+    final message = _message.text.trim();
+    if (subject.isEmpty || message.isEmpty) {
+      setState(() => _error = '请填写工单标题和内容');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
+      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
+      await widget.api.createTicket(
+        token,
+        level: _level,
+        message: message,
+        subject: subject,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = compactError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _subject,
+            decoration: const InputDecoration(labelText: '工单标题'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _message,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(labelText: '工单内容'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            initialValue: _level,
+            decoration: const InputDecoration(labelText: '优先级'),
+            items: const [
+              DropdownMenuItem(value: 0, child: Text('低')),
+              DropdownMenuItem(value: 1, child: Text('中')),
+              DropdownMenuItem(value: 2, child: Text('高')),
+            ],
+            onChanged: _busy
+                ? null
+                : (value) => setState(() => _level = value!),
+          ),
+          if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child: Text(_busy ? '提交中...' : '提交工单'),
+          ),
+        ],
+      ),
     ),
   );
 }

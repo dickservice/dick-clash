@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/common/dick_service_api.dart';
 import 'package:fl_clash/common/dick_service_models.dart';
+import 'package:fl_clash/common/dick_service_expiry_cache.dart';
 import 'gift_card.dart';
 import 'login.dart';
 import 'orders.dart';
@@ -9,16 +10,21 @@ import 'tickets.dart';
 import '_common.dart';
 import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/common/dick_service_profile.dart';
+import 'package:fl_clash/common/print.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'payment_webview.dart';
 
-class DickServiceMinePage extends StatefulWidget {
+class DickServiceMinePage extends ConsumerStatefulWidget {
   const DickServiceMinePage({super.key, this.token});
   final String? token;
 
   @override
-  State<DickServiceMinePage> createState() => _DickServiceMinePageState();
+  ConsumerState<DickServiceMinePage> createState() =>
+      _DickServiceMinePageState();
 }
 
-class _DickServiceMinePageState extends State<DickServiceMinePage> {
+class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
   final _api = DickServiceApi();
   late Future<DickServiceSubscribe> _future;
 
@@ -148,9 +154,14 @@ class _DickServiceMinePageState extends State<DickServiceMinePage> {
                       label: const Text('兑换码兑换'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => _unsupported('重置流量'),
+                      onPressed: () => _resetTraffic(subscribe),
                       icon: const Icon(Icons.restart_alt),
                       label: const Text('重置流量'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _resetSubscribe,
+                      icon: const Icon(Icons.security_update_good),
+                      label: const Text('重置订阅链接'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.of(context).push(
@@ -182,7 +193,7 @@ class _DickServiceMinePageState extends State<DickServiceMinePage> {
                       label: const Text('工单'),
                     ),
                     TextButton.icon(
-                      onPressed: () => _unsupported('退出登录'),
+                      onPressed: _logout,
                       icon: const Icon(Icons.logout),
                       label: const Text('退出登录'),
                     ),
@@ -196,7 +207,111 @@ class _DickServiceMinePageState extends State<DickServiceMinePage> {
     );
   }
 
-  void _unsupported(String action) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text('$action暂不可用：请求体契约仍需动态捕获')));
+  Future<String> _token() async {
+    final prefs = await preferences.sharedPreferencesCompleter.future;
+    final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
+    if (token == null || token.isEmpty) throw StateError('登录已失效，请重新登录');
+    return token;
+  }
+
+  Future<void> _resetTraffic(DickServiceSubscribe subscribe) async {
+    final price = subscribe.resetPrice ?? 0;
+    if (subscribe.planId <= 0 || price <= 0) {
+      _showMessage('当前套餐没有可用的重置流量价格，请到官网处理');
+      return;
+    }
+    try {
+      final token = await _token();
+      final order = await _api.createOrder(
+        token,
+        'reset_price',
+        subscribe.planId,
+      );
+      final checkout = await _api.checkoutOrder(token, order.tradeNo, 1);
+      if (mounted) {
+        await openDickServicePaymentPage(
+          context,
+          checkout: checkout,
+          tradeNo: order.tradeNo,
+        );
+        _reload();
+      }
+    } catch (error) {
+      _showMessage(compactError(error));
+    }
+  }
+
+  Future<void> _resetSubscribe() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重置订阅链接'),
+        content: const Text('重置后旧订阅链接将失效，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _api.resetSecurity(await _token());
+      await ref
+          .read(profilesActionProvider.notifier)
+          .addDickServiceBoundProfile();
+      _showMessage('订阅已重置，软件内配置已自动刷新');
+      _reload();
+    } catch (error) {
+      _showMessage(compactError(error));
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('退出后将删除 Dick Service 授权和绑定配置。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('退出登录'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final prefs = await preferences.sharedPreferencesCompleter.future;
+    if (prefs == null) return;
+    final profile = ref.read(profilesProvider).dickServiceBoundProfile;
+    await prefs.remove(kDickServiceAuthDataKey);
+    await prefs.remove('dick_service_last_account_alert');
+    await prefs.setBool(DickServiceExpiryCacheStore.kBootstrapDone, false);
+    await DickServiceExpiryCacheStore(prefs).clear();
+    if (profile != null) {
+      await ref.read(profilesActionProvider.notifier).deleteProfile(profile.id);
+    }
+    if (!mounted) return;
+    await Navigator.of(context).pushAndRemoveUntil<void>(
+      MaterialPageRoute<void>(builder: (_) => const DickServiceLoginPage()),
+      (_) => false,
+    );
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 }

@@ -4,6 +4,8 @@ import 'package:fl_clash/common/dick_service_models.dart';
 import '_common.dart';
 import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/common/dick_service_profile.dart';
+import 'package:fl_clash/common/print.dart';
+import 'payment_webview.dart';
 
 class DickServiceOrdersPage extends StatefulWidget {
   const DickServiceOrdersPage({super.key, this.token});
@@ -82,23 +84,68 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
             for (final order in snapshot.data!)
               _OrderCard(
                 order: order,
-                onAction: () =>
-                    _unsupported(order.status == 0 ? '继续支付' : '取消支付'),
+                onPay: () => _pay(order),
+                onCancel: () => _cancel(order),
               ),
           ],
         );
       },
     ),
   );
-  void _unsupported(String action) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text('$action暂不可用：支付/取消请求体仍需动态捕获')));
+  Future<String> _token() async {
+    final prefs = await preferences.sharedPreferencesCompleter.future;
+    final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
+    if (token == null || token.isEmpty) throw StateError('登录 Dick Service');
+    return token;
+  }
+
+  Future<void> _pay(DickServiceUserOrder order) async {
+    try {
+      final checkout = await _api.checkoutOrder(
+        await _token(),
+        order.tradeNo,
+        1,
+      );
+      if (mounted) {
+        await openDickServicePaymentPage(
+          context,
+          checkout: checkout,
+          tradeNo: order.tradeNo,
+        );
+        if (mounted) _reload();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(compactError(error))));
+      }
+    }
+  }
+
+  Future<void> _cancel(DickServiceUserOrder order) async {
+    try {
+      await _api.cancelOrder(await _token(), order.tradeNo);
+      if (mounted) _reload();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(compactError(error))));
+      }
+    }
+  }
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onAction});
+  const _OrderCard({
+    required this.order,
+    required this.onPay,
+    required this.onCancel,
+  });
   final DickServiceUserOrder order;
-  final VoidCallback onAction;
+  final VoidCallback onPay;
+  final VoidCallback onCancel;
   @override
   Widget build(BuildContext context) => DickServicePanel(
     child: Column(
@@ -128,9 +175,9 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
             if (order.status == 0)
-              OutlinedButton(onPressed: onAction, child: const Text('继续支付')),
+              OutlinedButton(onPressed: onPay, child: const Text('继续支付')),
             if (order.status == 1)
-              TextButton(onPressed: onAction, child: const Text('取消支付')),
+              TextButton(onPressed: onCancel, child: const Text('取消支付')),
           ],
         ),
       ],

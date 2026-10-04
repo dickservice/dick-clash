@@ -112,6 +112,7 @@ class DickServiceSubscribe {
   final int u;
   final int d;
   final int? resetDay;
+  final int? resetPrice;
   final int planId;
   final Map<String, dynamic>? plan;
 
@@ -123,6 +124,7 @@ class DickServiceSubscribe {
     required this.u,
     required this.d,
     this.resetDay,
+    this.resetPrice,
     required this.planId,
     this.plan,
   });
@@ -139,6 +141,9 @@ class DickServiceSubscribe {
     final u = _firstNullableInt(a, b, 'u') ?? 0;
     final d = _firstNullableInt(a, b, 'd') ?? 0;
     final resetDay = _firstNullableInt(a, b, 'reset_day');
+    final resetPrice =
+        _firstNullableInt(a, b, 'reset_price') ??
+        _nullableInt(planMap?['reset_price']);
 
     String planName = '暂无套餐';
     if (planMap != null) {
@@ -154,6 +159,7 @@ class DickServiceSubscribe {
       u: u,
       d: d,
       resetDay: resetDay,
+      resetPrice: resetPrice,
       planId: planId,
       plan: planMap,
     );
@@ -445,6 +451,5 @@ class DickServicePlan {
 
 class AuthSession {
   final String token;
-  final Map<String, dynamic> raw;
-  const AuthSession({required this.token, required this.raw});
+  const AuthSession({required this.token});
 }
