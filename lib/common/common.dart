@@ -51,3 +51,4 @@ export 'webdav.dart';
 export 'dick_service_api.dart';
 export 'dick_service_expiry_cache.dart';
 export 'yaml.dart';
+export 'dick_service_models.dart';
