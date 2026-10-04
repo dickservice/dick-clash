@@ -48,4 +48,6 @@ export 'task.dart';
 export 'task_pool.dart';
 export 'text.dart';
 export 'webdav.dart';
+export 'dick_service_api.dart';
+export 'dick_service_expiry_cache.dart';
 export 'yaml.dart';

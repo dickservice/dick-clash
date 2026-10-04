@@ -34,10 +34,12 @@ Recovering those pieces requires a test account with dynamic request capture
 or service-side API documentation. The fork therefore does not claim full
 Dick Service account/payment parity yet.
 
+## Implemented from AOT (static-only, no guessing)
+
+- `lib/common/dick_service_api.dart` — baseUrl `https://airport.dicksupport.top`, UA `AuroraDeck/7.4.2 (Android; ndk-aurora-74; rv:20260630)`, HMAC key `c9f1f637…56bb7a4`, header names `X-Client-Id/Ts/Nonce/Sign/Sign-Version`, `GET /api/v1/guest/plan/fetch`, `GET /api/v1/user/{getSubscribe,info,order/fetch,ticket/fetch}`, `POST /api/v1/user/order/{save,checkout}`, response helpers `_asMap/_throwIfFailed/_unwrap/_extractUrl/_looksLikeHtml/_findUrl/_findHtml` and signing `method\npath?query\nts\nnonce\nsha256(canonicalBody)` verified from `aot-dick-full/asm/fl_clash/common/dick_service_api.dart`.
+- `lib/common/dick_service_expiry_cache.dart` — keys `dick_service_cached_expired_at/_has_active_plan/_plan_name/_last_subscribe_sync_at/_last_local_check_at/_bootstrap_done/_expired_lock` and save/clear semantics from `dick_service_expiry_cache.dart`. Login/order/ticket/gift-card request bodies remain unimplemented pending dynamic capture.
+
 ## Verification baseline
 
 The APK comparison used static analysis only. The rule asset hash above is
-checked against the extracted APK resource. Local Flutter 3.44.4/Dart 3.12.2
-cannot resolve this checkout's current dependency set (`freezed` requires a
-newer Dart SDK); release builds should use the Flutter 3.47.1 toolchain pinned
-by the project CI guidance.
+checked against the extracted APK resource. Verified with Flutter 3.47.1 / Dart 3.13.1 (`/opt/flutter`, `flutter pub get` + `flutter analyze` pass with 1 pre-existing info).
