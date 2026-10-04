@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'dart:math';
+import 'dick_service_models.dart';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -82,6 +83,13 @@ class DickServiceApi {
     return m;
   }
 
+  /// AOT fetchSubscribe combines subscription and account fields.
+  Future<DickServiceSubscribe> fetchSubscribe(String token) async {
+    final subscribe = _unwrap(await getSubscribe(token));
+    final info = await fetchUserInfo(token);
+    return DickServiceSubscribe.fromJson(subscribe, info);
+  }
+
   /// GET /api/v1/user/getSubscribe then unwrap+findUrl (AOT fetchSubscribeUrlFromAuthData)
   Future<String?> fetchSubscribeUrlFromAuthData(String token) async {
     final m = await getSubscribe(token);
@@ -125,15 +133,7 @@ class DickServiceApi {
     String token,
     Map<String, dynamic> body,
   ) async {
-    final res = await dio.post<Map<String, dynamic>>(
-      epOrderSave,
-      data: body,
-      options: Options(
-        headers: {'Authorization': token, 'Accept': 'application/json'},
-      ),
-    );
-    _throwIfFailed(_asMap(res.data));
-    return _asMap(res.data);
+    throw UnimplementedError('TODO(capture): order creation body');
   }
 
   Future<Map<String, dynamic>> checkoutOrder(
@@ -141,17 +141,13 @@ class DickServiceApi {
     String tradeNo,
     int method,
   ) async {
-    final res = await dio.post<Map<String, dynamic>>(
-      epOrderCheckout,
-      data: {'trade_no': tradeNo, 'method': method},
-      options: Options(
-        headers: {'Authorization': token, 'Accept': 'application/json'},
-      ),
-    );
-    final m = _asMap(res.data);
+    throw UnimplementedError('TODO(capture): checkout request body');
+  }
+
+  /// Response-only parser; does not issue an unverified payment request.
+  static Map<String, dynamic> parseCheckoutResponse(Map<String, dynamic> m) {
     _throwIfFailed(m);
     final data = m['data'];
-    // AOT: try _extractUrl -> url, else _looksLikeHtml -> html, else _findUrl/_findHtml
     if (data is String) {
       final u = _extractUrl(data);
       if (u != null) return {'url': u};

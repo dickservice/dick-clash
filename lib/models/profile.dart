@@ -177,7 +177,21 @@ extension ProfileExtension on Profile {
   }
 
   Future<Profile> update({required ValidateConfig validate}) async {
-    final response = await request.getFileResponseForUrl(url);
+    String fetchUrl = url;
+    if (isDickServiceBound) {
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      final auth = prefs?.getString(kDickServiceAuthDataKey);
+      if (auth == null || auth.isEmpty) throw StateError('登录 Dick Service');
+      final api = DickServiceApi();
+      try {
+        final resolved = await api.fetchSubscribeUrlFromAuthData(auth);
+        if (resolved == null || resolved.isEmpty) throw StateError('返回格式异常');
+        fetchUrl = resolved;
+      } finally {
+        api.dio.close();
+      }
+    }
+    final response = await request.getFileResponseForUrl(fetchUrl);
     final disposition = response.headers.value('content-disposition');
     final userinfo = response.headers.value('subscription-userinfo');
     return copyWith(

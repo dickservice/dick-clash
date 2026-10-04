@@ -192,7 +192,7 @@ class ApplicationState extends ConsumerState<Application> {
           home: child!,
         );
       },
-      child: const HomePage(),
+      child: const DickServiceBootstrapGate(child: HomePage()),
     );
   }
 

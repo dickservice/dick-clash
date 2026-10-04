@@ -7,6 +7,10 @@ extension PageLabelL10n on PageLabel {
   String get label {
     final appLocalizations = currentAppLocalizations;
     return switch (this) {
+      PageLabel.dickServiceMine => '我的',
+      PageLabel.dickServiceShop => '商城',
+      PageLabel.dickServiceOrders => '我的订单',
+      PageLabel.dickServiceTickets => '工单',
       PageLabel.dashboard => appLocalizations.dashboard,
       PageLabel.proxies => appLocalizations.proxies,
       PageLabel.profiles => appLocalizations.profiles,
@@ -25,6 +29,10 @@ extension PageLabelL10n on PageLabel {
       PageLabel.requests => appLocalizations.requestsDesc,
       PageLabel.resources => appLocalizations.resourcesDesc,
       PageLabel.connections => appLocalizations.connectionsDesc,
+      PageLabel.dickServiceMine ||
+      PageLabel.dickServiceShop ||
+      PageLabel.dickServiceOrders ||
+      PageLabel.dickServiceTickets ||
       PageLabel.dashboard ||
       PageLabel.proxies ||
       PageLabel.profiles ||

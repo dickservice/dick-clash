@@ -38,6 +38,15 @@ Dick Service account/payment parity yet.
 
 - `lib/common/dick_service_api.dart` — baseUrl `https://airport.dicksupport.top`, UA `AuroraDeck/7.4.2 (Android; ndk-aurora-74; rv:20260630)`, HMAC key `c9f1f637…56bb7a4`, header names `X-Client-Id/Ts/Nonce/Sign/Sign-Version`, `GET /api/v1/guest/plan/fetch`, `GET /api/v1/user/{getSubscribe,info,order/fetch,ticket/fetch}`, `POST /api/v1/user/order/{save,checkout}`, response helpers `_asMap/_throwIfFailed/_unwrap/_extractUrl/_looksLikeHtml/_findUrl/_findHtml` and signing `method\npath?query\nts\nnonce\nsha256(canonicalBody)` verified from `aot-dick-full/asm/fl_clash/common/dick_service_api.dart`.
 - `lib/common/dick_service_expiry_cache.dart` — keys `dick_service_cached_expired_at/_has_active_plan/_plan_name/_last_subscribe_sync_at/_last_local_check_at/_bootstrap_done/_expired_lock` and save/clear semantics from `dick_service_expiry_cache.dart`. Login/order/ticket/gift-card request bodies remain unimplemented pending dynamic capture.
+- `lib/common/dick_service_models.dart` — tolerant static-AOT models for subscriptions, plans, orders, tickets, checkout responses, and gift-card results.
+- `lib/common/dick_service_profile.dart` — exact bound-subscription URL detection and `dick_service_auth_data` key.
+- `lib/pages/dick_service/` — model-driven read-only account, shop, order, ticket, login, gift-card, and payment states. Mutating requests, login persistence, and payment WebView behavior remain explicit capture TODOs.
+- `lib/pages/dick_service/gates.dart` — bootstrap and expiry gates, lifecycle-resume recheck, cache/signature handling, and the observed expiry messages. Offline grace and account-alert policy remain unverified.
+- `lib/common/dick_service_api.dart` — typed subscription fetch joins the observed `getSubscribe` and `info` GET responses; unsupported POST contracts do not reach the transport.
+
+The focused static tests cover the observed GET signing/subscription join and assert
+that unsupported login/order/checkout writes fail before transport. Flutter analysis
+passes with one pre-existing info in `test/widgets/scrollbar_inset_test.dart`.
 
 ## Verification baseline
 

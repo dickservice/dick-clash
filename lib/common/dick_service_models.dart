@@ -259,11 +259,13 @@ class DickServiceGiftCardRedeemResult {
     final tpl = _stringValue(json['template_name']);
     final pid = _nullableInt(json['plan_id']);
     List<dynamic> rewards = const [];
-    if (json['rewards'] is List)
+    if (json['rewards'] is List) {
       rewards = List<dynamic>.from(json['rewards'] as List);
+    }
     List<dynamic> invite = const [];
-    if (json['invite_rewards'] is List)
+    if (json['invite_rewards'] is List) {
       invite = List<dynamic>.from(json['invite_rewards'] as List);
+    }
     return DickServiceGiftCardRedeemResult(
       message: msg,
       templateName: tpl,
@@ -411,8 +413,9 @@ class DickServicePlan {
         : '未命名套餐';
     final content = _stringValue(json['content']);
     List<String> tags = const [];
-    if (json['tags'] is List)
+    if (json['tags'] is List) {
       tags = (json['tags'] as List).map((e) => e.toString()).toList();
+    }
     List<DickServicePriceOption> prices = const [];
     if (json['prices'] is List) {
       prices = (json['prices'] as List).map((e) {
@@ -425,7 +428,7 @@ class DickServicePlan {
             resetPrice: _nullableInt(m['reset_price']),
           );
         }
-        return DickServicePriceOption(id: 0, price: 0);
+        return const DickServicePriceOption(id: 0, price: 0);
       }).toList();
     }
     return DickServicePlan(

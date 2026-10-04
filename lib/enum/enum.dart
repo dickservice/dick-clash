@@ -329,6 +329,10 @@ extension GeoResourceExt on GeoResource {
 }
 
 enum PageLabel {
+  dickServiceMine,
+  dickServiceShop,
+  dickServiceOrders,
+  dickServiceTickets,
   dashboard,
   proxies,
   profiles,

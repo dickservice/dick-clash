@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/app_ports.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/pages/pages.dart';
 import 'package:fl_clash/views/views.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -13,6 +14,30 @@ class Navigation implements NavigationPort {
     bool hasProxies = false,
   }) {
     return [
+      NavigationItem(
+        icon: const Icon(Icons.account_circle),
+        label: PageLabel.dickServiceMine,
+        builder: (_) => const DickServiceMinePage(),
+        modes: [NavigationItemMode.desktop, NavigationItemMode.more],
+      ),
+      NavigationItem(
+        icon: const Icon(Icons.shopping_bag),
+        label: PageLabel.dickServiceShop,
+        builder: (_) => const DickServiceShopPage(),
+        modes: [NavigationItemMode.desktop, NavigationItemMode.more],
+      ),
+      NavigationItem(
+        icon: const Icon(Icons.receipt_long),
+        label: PageLabel.dickServiceOrders,
+        builder: (_) => const DickServiceOrdersPage(),
+        modes: [NavigationItemMode.desktop, NavigationItemMode.more],
+      ),
+      NavigationItem(
+        icon: const Icon(Icons.support_agent),
+        label: PageLabel.dickServiceTickets,
+        builder: (_) => const DickServiceTicketsPage(),
+        modes: [NavigationItemMode.desktop, NavigationItemMode.more],
+      ),
       NavigationItem(
         keep: false,
         icon: const Icon(Icons.space_dashboard),

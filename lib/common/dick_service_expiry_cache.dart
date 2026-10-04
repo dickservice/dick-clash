@@ -1,6 +1,6 @@
-// Port of AOT DickServiceExpiryCacheStore / DickServiceExpiryCache — static reconstruction.
+// Port of AOT DickServiceExpiryCacheStore / DickServiceExpiryCache.
 // Evidence: aot-dick-full/asm/fl_clash/common/dick_service_expiry_cache.dart
-// Classes 2664, 2665. Do NOT treat as production contract until capture.
+// and aot-dick-full/objs.txt (Duration@c14b91 = 0x141dd76000 us = 1 day).
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -45,36 +45,30 @@ class DickServiceExpiryCache {
   });
 
   bool get isExpired {
-    if (expiredLock) return true;
-    if (!signatureValid) return false;
-    // AOT: expiredLock || signatureValid && _isExpiredAt(cachedExpiredAt)
-    // Keep conservative: if signature invalid, don't treat as expired.
-    if (cachedHasActivePlan && _isExpiredAt(cachedExpiredAt)) return true;
-    if (!cachedHasActivePlan) return true;
-    return false;
+    // AOT fields 0x17..0x27 represent lock/integrity/clock/sync/plan state.
+    if (expiredLock || !signatureValid || isPastLocalCheckWindow) return true;
+    if (lastSubscribeSyncAt <= 0 || !cachedHasActivePlan) return true;
+    return _isExpiredAt(cachedExpiredAt);
   }
 
   bool shouldRefresh({bool force = false}) {
     if (force) return true;
     if (lastSubscribeSyncAt <= 0) return true;
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    // AOT difference check threshold appears ~60s for local check window,
-    // but refresh interval is not fully verified — use 1h as safe default.
-    // TODO(capture): verify exact refresh interval from dynamic capture.
-    const refreshIntervalSec = 3600;
-    return nowSec - lastSubscribeSyncAt >= refreshIntervalSec;
+    final elapsed = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(lastSubscribeSyncAt),
+    );
+    // AOT compares DateTime.difference against Duration@c14b91. The object
+    // dump gives 0x141dd76000 microseconds, exactly Duration(days: 1).
+    return elapsed >= const Duration(days: 1);
   }
 
   static bool _isExpiredAt(int expiredAt) {
     if (expiredAt <= 0) return false;
+    // AOT multiplies the seconds value by 1000 before DateTime construction,
+    // then returns !expiration.isAfter(now), i.e. expiration <= now.
     final expMs = expiredAt * 1000;
-    // AOT uses DateTime._validateMilliseconds + isAfter(now)
-    try {
-      final exp = DateTime.fromMillisecondsSinceEpoch(expMs);
-      return DateTime.now().isAfter(exp);
-    } catch (_) {
-      return false;
-    }
+    final exp = DateTime.fromMillisecondsSinceEpoch(expMs);
+    return !exp.isAfter(DateTime.now());
   }
 }
 
@@ -116,25 +110,27 @@ class DickServiceExpiryCacheStore {
   }
 
   Future<void> saveSubscribe(DickServiceSubscribeCompat s) async {
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
     final expiredAt = s.normalizedExpiredAt() ?? 0;
     final hasActivePlan = s.hasActivePlan;
     final planName = s.planName ?? '';
     await prefs.setInt(kCachedExpiredAt, expiredAt);
     await prefs.setBool(kCachedHasActivePlan, hasActivePlan);
     await prefs.setString(kCachedPlanName, planName);
-    await prefs.setInt(kLastSubscribeSyncAt, nowSec);
-    await prefs.setInt(kLastLocalCheckAt, nowSec);
+    await prefs.setInt(kLastSubscribeSyncAt, nowMs);
+    await prefs.setInt(kLastLocalCheckAt, nowMs);
     if (s.isExpiredNow()) {
       await prefs.setBool(kExpiredLock, true);
     } else {
       await prefs.remove(kExpiredLock);
     }
-    final sig = _signature(expiredAt, hasActivePlan, planName, nowSec, nowSec);
+    final sig = _signature(expiredAt, hasActivePlan, planName, nowMs, nowMs);
     await prefs.setString(kSubscribeCacheSignature, sig);
   }
 
-  Future<void> clearSubscribeCache() async {
+  // AOT method name is `clear` (asm ...:687d50). Keep the reconstruction's
+  // older public spelling as a forwarding alias for existing callers.
+  Future<void> clear() async {
     await prefs.remove(kCachedExpiredAt);
     await prefs.remove(kCachedHasActivePlan);
     await prefs.remove(kCachedPlanName);
@@ -143,6 +139,8 @@ class DickServiceExpiryCacheStore {
     await prefs.remove(kSubscribeCacheSignature);
     await prefs.setBool(kExpiredLock, false);
   }
+
+  Future<void> clearSubscribeCache() => clear();
 
   Future<DickServiceExpiryCache> load() async {
     final cachedExpiredAt = prefs.getInt(kCachedExpiredAt) ?? 0;
@@ -153,8 +151,10 @@ class DickServiceExpiryCacheStore {
     final expiredLock = prefs.getBool(kExpiredLock) ?? false;
     final storedSig = prefs.getString(kSubscribeCacheSignature);
 
-    bool signatureValid = false;
-    if (cachedExpiredAt > 0 || lastSubscribeSyncAt > 0) {
+    // AOT treats an entirely absent cache as not tampered; freshness/plan
+    // checks still make it refresh immediately.
+    bool signatureValid = true;
+    if (lastSubscribeSyncAt > 0 || cachedExpiredAt > 0) {
       final expected = _signature(
         cachedExpiredAt,
         cachedHasActivePlan,
@@ -174,11 +174,12 @@ class DickServiceExpiryCacheStore {
       signatureValid = storedSig == expected;
     }
 
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
     bool isPastLocalCheckWindow = false;
     if (lastLocalCheckAt > 0) {
-      // AOT checks now + 60000 < lastLocalCheck? keep simple window check
-      isPastLocalCheckWindow = nowSec > lastLocalCheckAt + 60;
+      // AOT checks (now + 60000) < lastLocalCheckAt. Values are epoch
+      // milliseconds, so this detects a clock rollback greater than 60s.
+      isPastLocalCheckWindow = nowMs + 60000 < lastLocalCheckAt;
       if (!signatureValid) {
         await prefs.setBool(kExpiredLock, true);
       } else {
@@ -199,7 +200,8 @@ class DickServiceExpiryCacheStore {
       lastLocalCheckAt: lastLocalCheckAt,
       cachedHasActivePlan: cachedHasActivePlan,
       cachedPlanName: cachedPlanName,
-      expiredLock: expiredLock || (!signatureValid && isPastLocalCheckWindow),
+      // AOT field 0x17 is storedLock || signatureInvalid || clockRollback.
+      expiredLock: expiredLock || !signatureValid || isPastLocalCheckWindow,
       signatureValid: signatureValid,
       isPastLocalCheckWindow: isPastLocalCheckWindow,
     );
