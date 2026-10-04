@@ -1,5 +1,33 @@
 # Dick Service port status
 
+## Integrated audit checkpoint
+
+The integrated API/cache/script/database suite passes 61 tests. Native asset
+hooks were temporarily disabled for Dart tests and restored afterward; this is
+not an Android release-build or device verification. Analysis reports only the
+pre-existing const-constructor info in scrollbar_inset_test.dart.
+
+- API: typed plan/order/ticket lists, period-keyed prices, UUID-v4 signing
+  nonce, dedicated reset-price order, response/error and formatting contracts.
+- Account pages: inline first-purchase login, cancellation confirmation,
+  authenticated list guidance, payment trade number and explicit close action.
+- State: bootstrap profile detection, persisted account-alert deduplication,
+  30-minute refresh, timestamped-cache integrity and clock rollback locks.
+- Rules: built-in script identity -10086, asset loading, non-persisted list
+  injection and script-mode fallback (not a global overwrite-mode change).
+- Android resources: launcher/round icons, adaptive foreground and TV banner
+  copied from the Dick APK. Implementation namespace is unchanged.
+- Shared UI: updater repository, Telegram link and Dick account navigation
+  are represented; no proven default VPN/startup-page change is claimed.
+
+Remaining evidence limits: original AOT was not reconstructed; core binaries
+have different Go/VCS metadata but their behavioral delta is unresolved.
+Firebase resource omission does not establish telemetry disablement. About
+core-link source/payload provenance, endpoint recovery, URL-matched logout
+cleanup and exact runtime warning behavior need further verification. APK
+signing identity, a rebuilt APK and real-device/payment flows are not verified.
+Consequently this checkpoint is not a claim of exhaustive binary parity.
+
 This fork reproduces the Dick-specific changes that can be verified from the
 `dick-service v1.0.15` APK without executing it:
 

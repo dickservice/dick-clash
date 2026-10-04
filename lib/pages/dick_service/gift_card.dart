@@ -36,7 +36,7 @@ class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
     try {
       final prefs = await preferences.sharedPreferencesCompleter.future;
       final token = prefs?.getString(kDickServiceAuthDataKey);
-      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
+      if (token == null || token.isEmpty) throw StateError('登录已失效，请重新登录');
       final result = await _api.redeemGiftCard(token, code);
       final subscribe = await _api.fetchSubscribe(token);
       if (prefs != null) {

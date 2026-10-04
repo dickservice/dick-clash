@@ -31,14 +31,8 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
   Future<List<DickServiceTicket>> _loadRows() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-    if (token == null || token.isEmpty) throw StateError('登录 Dick Service');
-    final m = await _api.fetchTickets(token);
-    final raw = m['tickets'] ?? m['data'];
-    if (raw is! List) throw const FormatException('返回格式异常');
-    return raw
-        .whereType<Map>()
-        .map((e) => DickServiceTicket.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    if (token == null || token.isEmpty) throw StateError('请先在商城登录/购买一次，再查看工单');
+    return _api.fetchTickets(token);
   }
 
   @override

@@ -222,11 +222,7 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     }
     try {
       final token = await _token();
-      final order = await _api.createOrder(
-        token,
-        'reset_price',
-        subscribe.planId,
-      );
+      final order = await _api.createTrafficResetOrder(token, subscribe.planId);
       final checkout = await _api.checkoutOrder(token, order.tradeNo, 1);
       if (mounted) {
         await openDickServicePaymentPage(
@@ -293,6 +289,12 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     if (confirmed != true) return;
     final prefs = await preferences.sharedPreferencesCompleter.future;
     if (prefs == null) return;
+    final token = prefs.getString(kDickServiceAuthDataKey);
+    if (token != null && token.isNotEmpty) {
+      try {
+        await _api.fetchSubscribeUrlFromAuthData(token);
+      } catch (_) {}
+    }
     final profile = ref.read(profilesProvider).dickServiceBoundProfile;
     await prefs.remove(kDickServiceAuthDataKey);
     await prefs.remove('dick_service_last_account_alert');

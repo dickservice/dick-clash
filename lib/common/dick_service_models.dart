@@ -7,7 +7,7 @@ int _intValue(dynamic v) {
   if (v is int) return v;
   if (v is double) return v.toInt();
   if (v is num) return v.toInt();
-  if (v is String) return int.tryParse(v.trim()) ?? 0;
+  if (v is String) return num.tryParse(v.trim())?.toInt() ?? 0;
   return 0;
 }
 
@@ -19,7 +19,7 @@ int? _nullableInt(dynamic v) {
   if (v is String) {
     final t = v.trim();
     if (t.isEmpty) return null;
-    return int.tryParse(t);
+    return num.tryParse(t)?.toInt();
   }
   return null;
 }
@@ -113,6 +113,7 @@ class DickServiceSubscribe {
   final int d;
   final int? resetDay;
   final int? resetPrice;
+  final int? resetTraffic;
   final int planId;
   final Map<String, dynamic>? plan;
 
@@ -125,6 +126,7 @@ class DickServiceSubscribe {
     required this.d,
     this.resetDay,
     this.resetPrice,
+    this.resetTraffic,
     required this.planId,
     this.plan,
   });
@@ -141,9 +143,16 @@ class DickServiceSubscribe {
     final u = _firstNullableInt(a, b, 'u') ?? 0;
     final d = _firstNullableInt(a, b, 'd') ?? 0;
     final resetDay = _firstNullableInt(a, b, 'reset_day');
+    final prices =
+        _firstMap(a, b, 'prices') ??
+        _firstMap(planMap ?? const <String, dynamic>{}, null, 'prices');
     final resetPrice =
         _firstNullableInt(a, b, 'reset_price') ??
+        _nullableInt(prices?['reset_price']) ??
         _nullableInt(planMap?['reset_price']);
+    final resetTraffic =
+        _nullableInt(prices?['reset_traffic']) ??
+        _nullableInt(planMap?['reset_traffic']);
 
     String planName = '暂无套餐';
     if (planMap != null) {
@@ -160,6 +169,7 @@ class DickServiceSubscribe {
       d: d,
       resetDay: resetDay,
       resetPrice: resetPrice,
+      resetTraffic: resetTraffic,
       planId: planId,
       plan: planMap,
     );
@@ -189,10 +199,9 @@ class DickServiceSubscribe {
 
   // AOT derived helpers (simplified but evidence-aligned)
   double remainingTrafficRatio() {
-    if (transferEnable <= 0) return 0;
-    final used = u + d;
-    if (used >= transferEnable) return 0;
-    return (transferEnable - used) / transferEnable;
+    if (transferEnable <= 0) return 1.0;
+    final ratio = (remainingTraffic() / transferEnable).toDouble();
+    return ratio.clamp(0.0, 1.0);
   }
 
   int remainingTraffic() {
@@ -201,8 +210,7 @@ class DickServiceSubscribe {
   }
 
   bool shouldWarnTrafficReset() {
-    // AOT compares remaining ratio < 0.2 etc; keep conservative
-    return remainingTrafficRatio() < 0.15;
+    return transferEnable > 0 && remainingTrafficRatio() < 0.1;
   }
 
   bool shouldWarnRenewal() {
@@ -213,25 +221,26 @@ class DickServiceSubscribe {
   }
 
   String remainingTimeText() {
+    if (!hasActivePlan) return '未开通/已过期';
+    if (expiredAt <= 0) return '长期有效';
     final et = expireTime();
-    if (et == null) return '--';
-    final diff = et.difference(DateTime.now());
-    if (diff.isNegative) return '已过期';
-    if (diff.inDays > 0) return '${diff.inDays}天';
-    if (diff.inHours > 0) return '${diff.inHours}小时';
-    return '${diff.inMinutes}分钟';
+    final days = et!.difference(DateTime.now()).inDays;
+    if (days < 0) return '已过期';
+    if (days == 0) return '今天到期';
+    return '剩余 $days 天';
   }
 
   static String _formatBytes(int v) {
     if (v <= 0) return '0B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
     double d = v.toDouble();
     int i = 0;
     while (d >= 1024 && i < units.length - 1) {
       d /= 1024;
       i++;
     }
-    return '${d.toStringAsFixed(i == 0 ? 0 : 2)}${units[i]}';
+    final decimals = d == d.truncateToDouble() ? 0 : 1;
+    return '${d.toStringAsFixed(decimals)}${units[i]}';
   }
 
   String get formattedTotalTraffic => _formatBytes(transferEnable);
@@ -281,16 +290,25 @@ class DickServiceGiftCardRedeemResult {
     );
   }
 
-  String get summary => _formatRewards(rewards);
+  String get summary {
+    final sections = <String>[];
+    if (rewards.isNotEmpty) sections.add(_formatRewards(rewards));
+    if (inviteRewards.isNotEmpty) {
+      sections.add('邀请奖励：${_formatRewards(inviteRewards)}');
+    }
+    return sections.isEmpty ? message : sections.join('；');
+  }
 
   static String _formatRewards(List<dynamic> list) {
     if (list.isEmpty) return '兑换成功';
-    return list.map((e) => e.toString()).join('、');
+    return list.map((e) => e.toString()).join('，');
   }
 }
 
 class DickServiceUserOrder {
+  final int? id;
   final String plan;
+  final String planName;
   final String tradeNo;
   final String name;
   final int status;
@@ -300,7 +318,9 @@ class DickServiceUserOrder {
   final String? createdAt;
 
   const DickServiceUserOrder({
+    this.id,
     required this.plan,
+    required this.planName,
     required this.tradeNo,
     required this.name,
     required this.status,
@@ -312,10 +332,15 @@ class DickServiceUserOrder {
 
   factory DickServiceUserOrder.fromJson(Map<String, dynamic> json) {
     final plan = _stringValue(json['plan']);
+    final planName = _stringValue(
+      json['plan_name'] ?? json['planName'] ?? json['name'],
+    );
     final tradeNo = _stringValue(json['trade_no'] ?? json['tradeNo']);
     final name = _stringValue(json['name']);
     final status = _intValue(json['status']);
-    final totalAmount = _intValue(json['total_amount'] ?? json['totalAmount']);
+    final totalAmount = _intValue(
+      json['total_amount'] ?? json['totalAmount'] ?? json['amount'],
+    );
     final period = _stringValue(json['period']);
     List<String> tags = const [];
     if (json['tags'] is List) {
@@ -328,6 +353,8 @@ class DickServiceUserOrder {
         : null;
     return DickServiceUserOrder(
       plan: plan,
+      planName: planName,
+      id: _nullableInt(json['id']),
       tradeNo: tradeNo,
       name: name,
       status: status,
@@ -338,7 +365,7 @@ class DickServiceUserOrder {
     );
   }
 
-  String get formattedAmount => '¥${(totalAmount / 100).toStringAsFixed(2)}';
+  String get formattedAmount => '¥${_formatCents(totalAmount)}';
   String get statusText {
     switch (status) {
       case 0:
@@ -347,8 +374,8 @@ class DickServiceUserOrder {
         return '已支付';
       case 2:
         return '已取消';
-      case 3:
-        return '已完成';
+      case 6:
+        return '已关闭';
       default:
         return '状态 $status';
     }
@@ -381,7 +408,7 @@ class DickServiceCheckout {
 }
 
 class DickServicePriceOption {
-  final int id;
+  final String id;
   final int price; // cents
   final String? period;
   final int? resetPrice;
@@ -393,7 +420,7 @@ class DickServicePriceOption {
     this.resetPrice,
   });
 
-  String get formattedPrice => '¥${(price / 100).toStringAsFixed(2)}';
+  String get formattedPrice => '¥${_formatCents(price)}';
 }
 
 class DickServicePlan {
@@ -422,20 +449,18 @@ class DickServicePlan {
     if (json['tags'] is List) {
       tags = (json['tags'] as List).map((e) => e.toString()).toList();
     }
-    List<DickServicePriceOption> prices = const [];
-    if (json['prices'] is List) {
-      prices = (json['prices'] as List).map((e) {
-        if (e is Map) {
-          final m = Map<String, dynamic>.from(e);
-          return DickServicePriceOption(
-            id: _intValue(m['id']),
-            price: _intValue(m['price'] ?? m['reset_price']),
-            period: m['period'] is String ? m['period'] as String : null,
-            resetPrice: _nullableInt(m['reset_price']),
+    final prices = <DickServicePriceOption>[];
+    final rawPrices = json['prices'];
+    if (rawPrices is Map) {
+      for (final entry in rawPrices.entries) {
+        final period = entry.key.toString();
+        final price = _positiveInt(entry.value);
+        if (price > 0) {
+          prices.add(
+            DickServicePriceOption(id: period, price: price, period: period),
           );
         }
-        return const DickServicePriceOption(id: 0, price: 0);
-      }).toList();
+      }
     }
     return DickServicePlan(
       id: id,
@@ -447,6 +472,19 @@ class DickServicePlan {
   }
 
   List<DickServicePriceOption> get priceOptions => prices;
+}
+
+int _positiveInt(dynamic value) {
+  final parsed = _intValue(value);
+  return parsed > 0 ? parsed : 0;
+}
+
+String _formatCents(int cents) {
+  final amount = cents / 100;
+  final rounded = amount.roundToDouble();
+  return amount == rounded
+      ? amount.toStringAsFixed(0)
+      : amount.toStringAsFixed(2);
 }
 
 class AuthSession {

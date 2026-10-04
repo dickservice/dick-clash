@@ -25,14 +25,7 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
 
   void _reload() {
     setState(() {
-      _future = _api.fetchPlans().then((m) {
-        final raw = m['plans'] ?? m['data'];
-        if (raw is! List) throw const FormatException('返回格式异常');
-        return raw
-            .whereType<Map>()
-            .map((e) => DickServicePlan.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-      });
+      _future = _api.fetchPlans();
     });
   }
 
@@ -132,7 +125,7 @@ class _PlanCard extends StatelessWidget {
           ),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: onBuy,
+          onPressed: plan.priceOptions.isEmpty ? null : onBuy,
           icon: const Icon(Icons.shopping_cart_checkout),
           label: const Text('创建订单并打开支付'),
         ),
@@ -157,6 +150,8 @@ class _PurchaseSheet extends StatefulWidget {
 
 class _PurchaseSheetState extends State<_PurchaseSheet> {
   final _coupon = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   late DickServicePriceOption _price = widget.plan.priceOptions.first;
   int _method = 1;
   bool _busy = false;
@@ -165,6 +160,8 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
   @override
   void dispose() {
     _coupon.dispose();
+    _email.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -180,8 +177,19 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
     });
     try {
       final prefs = await preferences.sharedPreferencesCompleter.future;
-      final token = prefs?.getString(kDickServiceAuthDataKey);
-      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
+      var token = prefs?.getString(kDickServiceAuthDataKey);
+      if (token == null || token.isEmpty) {
+        final email = _email.text.trim();
+        final password = _password.text;
+        if (email.isEmpty || password.isEmpty) {
+          throw StateError('首次购买需要登录官网账号；请输入账号和密码');
+        }
+        final session = await widget.api.login(email, password);
+        token = session.token;
+        if (prefs != null) {
+          await prefs.setString(kDickServiceAuthDataKey, token);
+        }
+      }
       final coupon = _coupon.text.trim();
       final order = await widget.api.createOrder(
         token,
@@ -253,6 +261,23 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
             onChanged: _busy
                 ? null
                 : (value) => setState(() => _method = value!),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '首次购买需要登录官网账号；登录成功后会保存授权，后续购买不再弹账号密码。',
+            style: TextStyle(color: Theme.of(context).colorScheme.outline),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: '账号（首次购买填写）'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _password,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: '密码（首次购买填写）'),
           ),
           const SizedBox(height: 12),
           TextField(

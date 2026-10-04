@@ -73,10 +73,20 @@ class _DickServicePaymentWebViewPageState
     child: DickServiceScaffold(
       title: '订单支付',
       actions: [
+        if (widget.tradeNo != null && widget.tradeNo!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Center(child: Text('订单号：${widget.tradeNo}')),
+          ),
         IconButton(
           onPressed: _controller.reload,
           tooltip: '刷新',
           icon: const Icon(Icons.refresh),
+        ),
+        IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: '关闭支付',
+          icon: const Icon(Icons.close),
         ),
       ],
       body: WebViewWidget(controller: _controller),

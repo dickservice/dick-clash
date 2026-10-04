@@ -32,14 +32,8 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
   Future<List<DickServiceUserOrder>> _loadRows() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-    if (token == null || token.isEmpty) throw StateError('登录 Dick Service');
-    final m = await _api.fetchOrders(token);
-    final raw = m['orders'] ?? m['data'];
-    if (raw is! List) throw const FormatException('返回格式异常');
-    return raw
-        .whereType<Map>()
-        .map((e) => DickServiceUserOrder.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    if (token == null || token.isEmpty) throw StateError('请先在商城登录/下单一次，再查看订单');
+    return _api.fetchOrders(token);
   }
 
   @override
@@ -78,16 +72,19 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
             title: '暂无订单',
           );
         }
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            for (final order in snapshot.data!)
-              _OrderCard(
-                order: order,
-                onPay: () => _pay(order),
-                onCancel: () => _cancel(order),
-              ),
-          ],
+        return RefreshIndicator(
+          onRefresh: () async => _reload(),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              for (final order in snapshot.data!)
+                _OrderCard(
+                  order: order,
+                  onPay: () => _pay(order),
+                  onCancel: () => _cancel(order),
+                ),
+            ],
+          ),
         );
       },
     ),
@@ -95,7 +92,7 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
   Future<String> _token() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-    if (token == null || token.isEmpty) throw StateError('登录 Dick Service');
+    if (token == null || token.isEmpty) throw StateError('登录已过期，请回到商城重新登录');
     return token;
   }
 
@@ -124,6 +121,24 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
   }
 
   Future<void> _cancel(DickServiceUserOrder order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('取消订单'),
+        content: Text('确定取消订单 ${order.tradeNo}？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     try {
       await _api.cancelOrder(await _token(), order.tradeNo);
       if (mounted) _reload();

@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class DickServiceSubscribeCompat {
   final String? planName;
   final bool hasActivePlan;
+
+  /// Unix seconds, matching DickServiceSubscribe::normalizedExpiredAt in AOT.
   final int? expiredAtMs;
   final bool isExpired;
 
@@ -151,19 +153,12 @@ class DickServiceExpiryCacheStore {
     final expiredLock = prefs.getBool(kExpiredLock) ?? false;
     final storedSig = prefs.getString(kSubscribeCacheSignature);
 
-    // AOT treats an entirely absent cache as not tampered; freshness/plan
-    // checks still make it refresh immediately.
-    bool signatureValid = true;
-    if (lastSubscribeSyncAt > 0 || cachedExpiredAt > 0) {
-      final expected = _signature(
-        cachedExpiredAt,
-        cachedHasActivePlan,
-        cachedPlanName,
-        lastSubscribeSyncAt,
-        lastLocalCheckAt,
-      );
-      signatureValid = storedSig == expected;
-    } else if (lastLocalCheckAt > 0) {
+    // AOT validates a signature whenever any timestamp says that a cache
+    // exists. With all timestamps at zero, the stored signature is ignored.
+    var signatureValid = true;
+    if (lastSubscribeSyncAt > 0 ||
+        cachedExpiredAt > 0 ||
+        lastLocalCheckAt > 0) {
       final expected = _signature(
         cachedExpiredAt,
         cachedHasActivePlan,
@@ -183,7 +178,7 @@ class DickServiceExpiryCacheStore {
       if (!signatureValid) {
         await prefs.setBool(kExpiredLock, true);
       } else {
-        // keep signature for future loads
+        // AOT rewrites the local-check/signature pair on every valid load.
         await _saveLastLocalCheck(
           cachedExpiredAt,
           cachedHasActivePlan,
@@ -200,7 +195,8 @@ class DickServiceExpiryCacheStore {
       lastLocalCheckAt: lastLocalCheckAt,
       cachedHasActivePlan: cachedHasActivePlan,
       cachedPlanName: cachedPlanName,
-      // AOT field 0x17 is storedLock || signatureInvalid || clockRollback.
+      // AOT's constructor field is the effective lock: persisted lock,
+      // signature failure, or clock rollback all make the cache expired.
       expiredLock: expiredLock || !signatureValid || isPastLocalCheckWindow,
       signatureValid: signatureValid,
       isPastLocalCheckWindow: isPastLocalCheckWindow,

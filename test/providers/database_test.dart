@@ -294,7 +294,14 @@ void main() {
       notifier = container.read(scriptsProvider.notifier);
     });
 
-    List<Script> read() => notifier.value;
+    List<Script> read() =>
+        notifier.value.where((script) => script.id != -10086).toList();
+
+    test('includes the built-in script without persisting it', () async {
+      expect(notifier.value.first.id, -10086);
+      expect(notifier.value.first.label, 'Dick Service');
+      expect(await testDatabase.scriptsDao.query().get(), isEmpty);
+    });
 
     test('put appends a new script and replaces an existing one', () async {
       notifier.put(script(1, 'First'));

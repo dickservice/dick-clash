@@ -32,6 +32,7 @@ class DickServiceApi {
   static const String epTicketSave = '/api/v1/user/ticket/save';
   static const String epGiftCardRedeem = '/api/v1/user/gift-card/redeem';
   static const String epResetSecurity = '/api/v1/user/resetSecurity';
+  static const String _invalidCredentials = '账号或密码错误';
 
   final Dio dio;
 
@@ -51,12 +52,19 @@ class DickServiceApi {
   }
 
   // Verified verbs, bodies, headers, and response handling from AOT call sites.
-  Future<Map<String, dynamic>> fetchPlans() async {
+  Future<List<DickServicePlan>> fetchPlans() async {
     final res = await dio.get<Map<String, dynamic>>(
       epPlanFetch,
       options: Options(headers: {'Accept': 'application/json'}),
     );
-    return _unwrap(_asMap(res.data));
+    final response = _asMap(res.data);
+    _throwIfFailed(response);
+    final data = response['data'];
+    if (data is! List) throw Exception('套餐列表返回格式异常');
+    return data
+        .whereType<Map>()
+        .map((e) => DickServicePlan.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<Map<String, dynamic>> fetchUserInfo(String token) async {
@@ -96,46 +104,58 @@ class DickServiceApi {
   }
 
   Future<AuthSession> login(String email, String password) async {
-    final res = await dio.post<Map<String, dynamic>>(
-      epLogin,
-      data: {'email': email, 'password': password},
-      options: Options(headers: {'Accept': 'application/json'}),
-    );
-    final data = _unwrap(_asMap(res.data));
-    final token = _findAuthData(data);
-    if (token == null || token.isEmpty) {
-      throw Exception('Login succeeded but auth data is missing');
+    final endpoints = await _resolveEndpointCandidates();
+    for (final endpoint in endpoints) {
+      try {
+        return await _loginWithEndpoint(endpoint, email, password);
+      } on DioException catch (error) {
+        final status = error.response?.statusCode;
+        if (status == 401 || status == 403) {
+          throw Exception(_invalidCredentials);
+        }
+      } on Exception catch (error) {
+        if (error.toString().contains(_invalidCredentials)) {
+          rethrow;
+        }
+      }
     }
-    final subscribe = await dio.get<Map<String, dynamic>>(
-      epGetSubscribe,
-      options: Options(
-        headers: {'Authorization': token, 'Accept': 'application/json'},
-      ),
-    );
-    if (_findUrl(_unwrap(_asMap(subscribe.data))) == null) {
-      throw Exception('Subscription URL is missing');
-    }
-    return AuthSession(token: token);
+    throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$endpoints');
   }
 
-  Future<Map<String, dynamic>> fetchOrders(String token) async {
+  Future<List<DickServiceUserOrder>> fetchOrders(String token) async {
     final res = await dio.get<Map<String, dynamic>>(
       epOrderFetch,
       options: Options(
         headers: {'Authorization': token, 'Accept': 'application/json'},
       ),
     );
-    return _unwrap(_asMap(res.data));
+    final response = _asMap(res.data);
+    _throwIfFailed(response);
+    final data = response['data'];
+    final raw = data is Map ? data['orders'] : data;
+    if (raw is! List) throw Exception('订单列表返回格式异常');
+    return raw
+        .whereType<Map>()
+        .map((e) => DickServiceUserOrder.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
-  Future<Map<String, dynamic>> fetchTickets(String token) async {
+  Future<List<DickServiceTicket>> fetchTickets(String token) async {
     final res = await dio.get<Map<String, dynamic>>(
       epTicketFetch,
       options: Options(
         headers: {'Authorization': token, 'Accept': 'application/json'},
       ),
     );
-    return _unwrap(_asMap(res.data));
+    final response = _asMap(res.data);
+    _throwIfFailed(response);
+    final data = response['data'];
+    final raw = data is Map ? data['tickets'] : data;
+    if (raw is! List) throw Exception('工单列表返回格式异常');
+    return raw
+        .whereType<Map>()
+        .map((e) => DickServiceTicket.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<DickServiceOrder> createOrder(
@@ -158,6 +178,10 @@ class DickServiceApi {
     return DickServiceOrder.fromJson(_unwrap(_asMap(res.data)));
   }
 
+  /// AOT reset flow creates an order using the special `reset_price` period.
+  Future<DickServiceOrder> createTrafficResetOrder(String token, int planId) =>
+      createOrder(token, 'reset_price', planId);
+
   Future<DickServiceCheckout> checkoutOrder(
     String token,
     String tradeNo,
@@ -173,7 +197,9 @@ class DickServiceApi {
     final parsed = parseCheckoutResponse(_asMap(res.data));
     final url = parsed['url'];
     if (url is String) return DickServiceCheckout.url(url);
-    return DickServiceCheckout.html(parsed['html']! as String);
+    final html = parsed['html'];
+    if (html is String) return DickServiceCheckout.html(html);
+    throw Exception('支付链接返回为空');
   }
 
   Future<DickServiceGiftCardRedeemResult> redeemGiftCard(
@@ -253,6 +279,42 @@ class DickServiceApi {
       if (h != null) return {'html': h};
     }
     throw Exception('支付链接返回为空');
+  }
+
+  Future<List<_LoginEndpoint>> _resolveEndpointCandidates() async => [
+    const _LoginEndpoint('https://airport.dicksupport.top'),
+  ];
+
+  Future<AuthSession> _loginWithEndpoint(
+    _LoginEndpoint endpoint,
+    String email,
+    String password,
+  ) async {
+    final res = await dio.post<Map<String, dynamic>>(
+      endpoint.uri(epLogin).toString(),
+      data: {'email': email, 'password': password},
+      options: Options(headers: {'Accept': 'application/json'}),
+    );
+    final response = _asMap(res.data);
+    final status = response['status']?.toString().toLowerCase();
+    if (status == 'fail' || status == 'error') {
+      throw Exception(_invalidCredentials);
+    }
+    final data = _unwrap(response);
+    final token = _findAuthData(data);
+    if (token == null || token.isEmpty) {
+      throw Exception('Login succeeded but auth data is missing');
+    }
+    final subscribe = await dio.get<Map<String, dynamic>>(
+      endpoint.uri(epGetSubscribe).toString(),
+      options: Options(
+        headers: {'Authorization': token, 'Accept': 'application/json'},
+      ),
+    );
+    if (_findUrl(_unwrap(_asMap(subscribe.data))) == null) {
+      throw Exception('Subscription URL is missing');
+    }
+    return AuthSession(token: token);
   }
 
   // --- helpers mirroring AOT ---
@@ -450,7 +512,20 @@ class _ClientSignatureInterceptor extends Interceptor {
 
   String _nonce() {
     final bytes = List<int>.generate(16, (_) => _secure.nextInt(256));
-    // AOT maps each byte via Utils::uuidV4 closure then join; emulate as hex
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).toList();
+    return '${hex.sublist(0, 4).join()}-${hex.sublist(4, 6).join()}-'
+        '${hex.sublist(6, 8).join()}-${hex.sublist(8, 10).join()}-'
+        '${hex.sublist(10).join()}';
   }
+}
+
+class _LoginEndpoint {
+  final String baseUrl;
+  const _LoginEndpoint(this.baseUrl);
+
+  Uri uri(String path) => Uri.parse('$baseUrl$path');
+  @override
+  String toString() => baseUrl;
 }

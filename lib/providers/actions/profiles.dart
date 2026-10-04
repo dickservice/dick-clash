@@ -148,6 +148,7 @@ class ProfilesAction extends _$ProfilesAction {
     final profile = await globalState.loadingRun(
       tag: LoadingTag.profiles,
       () => Profile.normal(
+        label: 'Dick Service',
         url: kDickServiceBoundSubscribeUrl,
       ).update(validate: (path) => _core.validateConfig(path)),
       title: currentAppLocalizations.addProfile,

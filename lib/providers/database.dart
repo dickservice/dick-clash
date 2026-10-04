@@ -169,7 +169,10 @@ class Profiles extends _$Profiles {
 class Scripts extends _$Scripts with AsyncNotifierMixin, OptimisticMixin {
   @override
   Stream<List<Script>> build() {
-    return database.scriptsDao.query().watch();
+    return database.scriptsDao.query().watch().map((scripts) {
+      if (scripts.any((script) => script.id == -10086)) return scripts;
+      return [Script.builtInDickService(), ...scripts];
+    });
   }
 
   @override

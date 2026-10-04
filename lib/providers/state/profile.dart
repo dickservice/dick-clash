@@ -53,8 +53,8 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
     if (overwriteType == OverwriteType.standard) {
       addedRules = await database.rulesDao.queryAddedRules(profileId).get();
     } else if (overwriteType == OverwriteType.script) {
-      script = scriptId == null
-          ? null
+      script = scriptId == null || scriptId == -10086
+          ? Script.builtInDickService()
           : await database.scriptsDao.get(scriptId).getSingleOrNull();
     } else {
       rules = await database.rulesDao.queryProfileCustomRules(profileId).get();

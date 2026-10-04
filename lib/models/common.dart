@@ -7,6 +7,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter/services.dart';
 
 import 'clash_config.dart';
 
@@ -598,6 +599,9 @@ abstract class Script with _$Script {
 
   factory Script.fromJson(Map<String, Object?> json) => _$ScriptFromJson(json);
 
+  factory Script.builtInDickService() =>
+      Script(id: -10086, label: 'Dick Service', lastUpdateTime: DateTime(2026));
+
   factory Script.create({required String label}) {
     return Script(
       id: snowflake.id,
@@ -626,6 +630,9 @@ extension ScriptExt on Script {
   Future<String> get path async => appPath.getScriptPath(id.toString());
 
   Future<String?> get content async {
+    if (id == -10086) {
+      return rootBundle.loadString('assets/data/dick_rule.js');
+    }
     final file = File(await path);
     if (await file.exists()) {
       return file.readAsString();

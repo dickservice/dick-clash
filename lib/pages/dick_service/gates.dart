@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'login.dart';
 import 'shop.dart';
@@ -19,6 +20,9 @@ class DickServiceBootstrapGate extends ConsumerStatefulWidget {
 }
 
 class _BootstrapGateState extends ConsumerState<DickServiceBootstrapGate> {
+  static const _lastAccountAlertKey = 'dick_service_last_account_alert';
+
+  late final DickServiceApi _api = DickServiceApi();
   bool? _complete;
 
   @override
@@ -30,14 +34,63 @@ class _BootstrapGateState extends ConsumerState<DickServiceBootstrapGate> {
   Future<void> _load() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     if (!mounted) return;
+    final profiles = ref.read(profilesProvider);
+    final auth = prefs?.getString(kDickServiceAuthDataKey);
     setState(() {
       // AOT reads dick_service_auth_data here. Normal Clash profiles do not
       // satisfy the Dick Service bootstrap gate.
-      final auth = prefs?.getString(kDickServiceAuthDataKey);
-      _complete = auth != null && auth.isNotEmpty;
+      final bootstrapDone =
+          prefs?.getBool(DickServiceExpiryCacheStore.kBootstrapDone) ?? false;
+      _complete = bootstrapDone || profiles.hasDickServiceBound;
     });
-    // TODO(capture): account-alert deduplication and exact warning thresholds.
-    // Subscription validation is performed by the inner expiry gate.
+    if (auth != null && auth.isNotEmpty && prefs != null) {
+      unawaited(_checkAccountStatus(prefs, auth));
+    }
+  }
+
+  Future<void> _checkAccountStatus(SharedPreferences prefs, String auth) async {
+    final store = DickServiceExpiryCacheStore(prefs);
+    final cache = await store.load();
+    if (!cache.shouldRefresh()) return;
+
+    // The AOT bootstrap check passes the auth token read during _load into
+    // fetchSubscribe and does not perform a second account-state branch here.
+    final subscribe = await _api.fetchSubscribe(auth);
+    await store.saveSubscribe(
+      DickServiceSubscribeCompat(
+        planName: subscribe.planName,
+        hasActivePlan: subscribe.hasActivePlan,
+        expiredAtMs: subscribe.normalizedExpiredAt(),
+        isExpired: subscribe.isExpired(),
+      ),
+    );
+
+    final warnings = <String>[];
+    if (subscribe.shouldWarnRenewal()) {
+      warnings.add('套餐${subscribe.remainingTimeText()}，请及时续费。续费仅增加时长，不增加当月流量。');
+    }
+    if (subscribe.shouldWarnTrafficReset()) {
+      warnings.add('流量剩余不足 10%，建议重置流量。重置流量仅重置当月流量，不增加时长。');
+    }
+    if (warnings.isEmpty || !mounted) return;
+
+    final message = warnings.join('\n\n');
+    if (prefs.getString(_lastAccountAlertKey) == message) return;
+    await prefs.setString(_lastAccountAlertKey, message);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('账号状态提醒'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -70,6 +123,7 @@ class DickServiceExpiryGate extends ConsumerStatefulWidget {
 class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
     with WidgetsBindingObserver {
   late final DickServiceApi _api = widget.api ?? DickServiceApi();
+  Timer? _timer;
   bool _checking = false;
   bool _pendingForce = false;
   String? _message;
@@ -78,6 +132,10 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _timer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => unawaited(_checkSubscription()),
+    );
     unawaited(_checkSubscription());
   }
 
@@ -132,9 +190,6 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
               : null,
         );
       }
-    } catch (_) {
-      // TODO(capture): exact offline grace policy. Retain observed cache state;
-      // a transport failure alone must not manufacture an expired account.
     } finally {
       _checking = false;
       if (_pendingForce && mounted) {
@@ -194,6 +249,7 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
     if (widget.api == null) _api.dio.close();
     super.dispose();
   }
