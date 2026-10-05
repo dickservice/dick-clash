@@ -17,6 +17,8 @@ class DickServiceOrdersPage extends StatefulWidget {
 class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
   final _api = DickServiceApi();
   late Future<List<DickServiceUserOrder>> _future;
+  bool _paying = false;
+  bool _cancelling = false;
   @override
   void initState() {
     super.initState();
@@ -88,8 +90,10 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
               final order = orders[index];
               return _OrderCard(
                 order: order,
-                onPay: () => _pay(order),
-                onCancel: () => _cancel(order),
+                paying: _paying,
+                cancelling: _cancelling,
+                onPay: _paying ? null : () => _pay(order),
+                onCancel: _cancelling ? null : () => _cancel(order),
               );
             },
           );
@@ -105,6 +109,8 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
   }
 
   Future<void> _pay(DickServiceUserOrder order) async {
+    if (_paying) return;
+    setState(() => _paying = true);
     try {
       final checkout = await _api.checkoutOrder(
         await _token(),
@@ -125,10 +131,13 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
           context,
         ).showSnackBar(SnackBar(content: Text(compactError(error))));
       }
+    } finally {
+      if (mounted) setState(() => _paying = false);
     }
   }
 
   Future<void> _cancel(DickServiceUserOrder order) async {
+    if (_cancelling) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -147,6 +156,7 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
       ),
     );
     if (confirmed != true) return;
+    setState(() => _cancelling = true);
     try {
       await _api.cancelOrder(await _token(), order.tradeNo);
       if (mounted) await _reload();
@@ -156,6 +166,8 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
           context,
         ).showSnackBar(SnackBar(content: Text(compactError(error))));
       }
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
     }
   }
 }
@@ -163,12 +175,16 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
+    required this.paying,
+    required this.cancelling,
     required this.onPay,
     required this.onCancel,
   });
   final DickServiceUserOrder order;
-  final VoidCallback onPay;
-  final VoidCallback onCancel;
+  final bool paying;
+  final bool cancelling;
+  final VoidCallback? onPay;
+  final VoidCallback? onCancel;
   String get _title {
     if (order.name.isNotEmpty) return order.name;
     if (order.planName.isNotEmpty) return order.planName;
@@ -206,9 +222,29 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
             if (order.status == 0)
-              OutlinedButton(onPressed: onPay, child: const Text('继续支付')),
+              FilledButton.icon(
+                onPressed: onPay,
+                icon: paying
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.payment),
+                label: Text(paying ? '正在打开...' : '继续支付'),
+              ),
             if (order.status == 1)
-              TextButton(onPressed: onCancel, child: const Text('取消支付')),
+              OutlinedButton.icon(
+                onPressed: onCancel,
+                icon: cancelling
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.close),
+                label: Text(cancelling ? '取消中...' : '取消支付'),
+              ),
           ],
         ),
       ],
