@@ -46,7 +46,8 @@ app.*.map.json
 .claude/worktrees/
 
 # Documentation (generated/planning artifacts)
-docs/
+# Keep Dick Service port evidence doc tracked.
+!docs/dick-service-port.md
 
 
 # Android Studio will place build artifacts here
