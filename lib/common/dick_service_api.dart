@@ -91,7 +91,12 @@ class DickServiceApi {
   /// AOT fetchSubscribe combines subscription and account fields.
   Future<DickServiceSubscribe> fetchSubscribe(String token) async {
     final subscribe = _unwrap(await getSubscribe(token));
-    final info = await fetchUserInfo(token);
+    Map<String, dynamic>? info;
+    try {
+      info = await fetchUserInfo(token);
+    } catch (_) {
+      info = null;
+    }
     return DickServiceSubscribe.fromJson(subscribe, info);
   }
 

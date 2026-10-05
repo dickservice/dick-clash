@@ -166,6 +166,10 @@ This document now records the current workdir
   (`0x67adfc..0x67afec`). Recursive auth, URL, and checkout-HTML lookup walks
   maps but intentionally does not descend into lists (`0x67a78c`, `0x88be9c`,
   `0x8b3634`).
+- Subscription loading requires the `getSubscribe` response, but wraps the
+  subsequent `/api/v1/user/info` fetch in the APK's broad catch and passes
+  `null` account info to `DickServiceSubscribe.fromJson` on failure
+  (`0x686710..0x686794`).
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict

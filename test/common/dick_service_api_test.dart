@@ -88,6 +88,27 @@ void main() {
     },
   );
 
+  test(
+    'subscription tolerates user-info failure like the AOT catch path',
+    () async {
+      final adapter = _Adapter(statusCodes: {DickServiceApi.epUserInfo: 500});
+      final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
+        ..httpClientAdapter = adapter;
+      final api = DickServiceApi(dio: dio);
+
+      final result = await api.fetchSubscribe('example-token');
+
+      expect(result.planId, 3);
+      expect(result.planName, 'Example');
+      expect(result.expiredAt, 0);
+      expect(adapter.requests.map((request) => request.uri.path), [
+        DickServiceApi.epGetSubscribe,
+        DickServiceApi.epUserInfo,
+      ]);
+      dio.close();
+    },
+  );
+
   test('AOT plan prices are period-keyed positive cents', () {
     final plan = DickServicePlan.fromJson({
       'id': 7,
