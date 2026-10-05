@@ -5,7 +5,10 @@ import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/common/dick_service_profile.dart';
 import 'package:fl_clash/common/print.dart';
 import '_common.dart';
+import 'mine.dart';
+import 'orders.dart';
 import 'payment_webview.dart';
+import 'tickets.dart';
 
 class DickServiceShopPage extends StatefulWidget {
   const DickServiceShopPage({super.key});
@@ -40,6 +43,31 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
   Widget build(BuildContext context) => DickServiceScaffold(
     title: '商城',
     actions: [
+      IconButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const DickServiceMinePage()),
+        ),
+        tooltip: '我的',
+        icon: const Icon(Icons.person),
+      ),
+      IconButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const DickServiceOrdersPage(),
+          ),
+        ),
+        tooltip: '我的订单',
+        icon: const Icon(Icons.receipt_long),
+      ),
+      IconButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const DickServiceTicketsPage(),
+          ),
+        ),
+        tooltip: '工单',
+        icon: const Icon(Icons.support_agent),
+      ),
       IconButton(
         onPressed: _reload,
         tooltip: '刷新套餐',
