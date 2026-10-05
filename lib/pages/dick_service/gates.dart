@@ -127,7 +127,6 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   late final DickServiceApi _api = widget.api ?? DickServiceApi();
   Timer? _timer;
   bool _checking = false;
-  bool _pendingForce = false;
   String? _message;
 
   @override
@@ -149,10 +148,7 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   }
 
   Future<void> _checkSubscription({bool force = false}) async {
-    if (_checking) {
-      _pendingForce |= force;
-      return;
-    }
+    if (_checking) return;
     _checking = true;
     try {
       final prefs = await preferences.sharedPreferencesCompleter.future;
@@ -175,8 +171,6 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
       }
       if (!cache.shouldRefresh(force: force)) return;
       final subscribe = await _api.fetchSubscribe(auth);
-      // Never apply an old account response after a concurrent logout/login.
-      if (prefs.getString(kDickServiceAuthDataKey) != auth) return;
       await store.saveSubscribe(
         DickServiceSubscribeCompat(
           planName: subscribe.planName,
@@ -187,17 +181,23 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
       );
       if (mounted) {
         setState(
-          () => _message = subscribe.isTimeBasedExpired()
-              ? '您的套餐已到期，请续费以继续使用'
-              : null,
+          () => _message = subscribe.isExpired() ? '您的套餐已到期，请续费以继续使用' : null,
+        );
+      }
+    } catch (_) {
+      final prefs = await preferences.sharedPreferencesCompleter.future;
+      if (prefs == null) return;
+      final cache = await DickServiceExpiryCacheStore(prefs).load();
+      if (cache.isExpired && mounted) {
+        setState(
+          () =>
+              _message = (!cache.signatureValid || cache.isPastLocalCheckWindow)
+              ? '账号状态校验异常，请联网重新登录或续费后再使用'
+              : '您的套餐已到期，请续费以继续使用',
         );
       }
     } finally {
       _checking = false;
-      if (_pendingForce && mounted) {
-        _pendingForce = false;
-        unawaited(_checkSubscription(force: true));
-      }
     }
   }
 

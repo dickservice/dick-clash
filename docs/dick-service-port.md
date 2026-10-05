@@ -173,6 +173,10 @@ This document now records the current workdir
 - User-order `period` remains nullable and is stringified only when present,
   matching `DickServiceUserOrder.fromJson` at `0x90e208..0x90e27c`; the order
   card omits a null or empty period instead of normalizing the model to `''`.
+- Expiry refresh preserves the AOT control flow at `0x685a50..0x685ec0`:
+  concurrent checks return instead of queuing a forced retry; a fetch failure
+  reloads the cache and is otherwise swallowed; and a refreshed subscription
+  uses full `isExpired` semantics, including no active plan.
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
