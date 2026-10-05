@@ -204,10 +204,10 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   }
 
   Future<void> _openRenewPage() async {
+    setState(() => _message = null);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const DickServiceShopPage()),
     );
-    if (mounted) await _checkSubscription(force: true);
   }
 
   @override

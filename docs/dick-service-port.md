@@ -185,6 +185,10 @@ This document now records the current workdir
   object `Duration@c14d31` is `1,800,000,000µs` (30 minutes). Disposal removes
   the lifecycle observer and cancels that timer without closing the API client
   (`0x99a6bc..0x99a718`).
+- The expiry overlay's renewal action clears the current overlay/message before
+  pushing `DickServiceShopPage` and does not force-refresh on route return
+  (`0x83b420..0x83b4f8`). Later resume/timer checks retain responsibility for
+  revalidation.
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
