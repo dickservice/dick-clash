@@ -115,6 +115,7 @@ void main() {
     expect(cache.isPastLocalCheckWindow, isTrue);
     expect(cache.expiredLock, isTrue);
     expect(cache.isExpired, isTrue);
+    expect(prefs.getBool(DickServiceExpiryCacheStore.kExpiredLock), isTrue);
   });
 
   test('clear removes signed state and resets the persisted lock', () async {

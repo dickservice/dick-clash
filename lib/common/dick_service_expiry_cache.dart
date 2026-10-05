@@ -175,7 +175,7 @@ class DickServiceExpiryCacheStore {
       // AOT checks (now + 60000) < lastLocalCheckAt. Values are epoch
       // milliseconds, so this detects a clock rollback greater than 60s.
       isPastLocalCheckWindow = nowMs + 60000 < lastLocalCheckAt;
-      if (!signatureValid) {
+      if (!signatureValid || isPastLocalCheckWindow) {
         await prefs.setBool(kExpiredLock, true);
       } else {
         // AOT rewrites the local-check/signature pair on every valid load.
