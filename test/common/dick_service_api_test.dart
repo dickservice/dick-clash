@@ -188,6 +188,19 @@ void main() {
     expect(selectedPlan.resetPrice, 600);
     expect(subscribe.remainingTrafficRatio(), 1.0);
     expect(subscribe.shouldWarnTrafficReset(), isFalse);
+    expect(
+      const DickServiceSubscribe(
+        planName: 'Threshold',
+        hasActivePlan: true,
+        expiredAt: 0,
+        transferEnable: 100,
+        u: 90,
+        d: 0,
+        planId: 1,
+      ).shouldWarnTrafficReset(),
+      isTrue,
+      reason: 'AOT 0x88c8fc and 0xab13f0 include the exact 10% boundary',
+    );
     expect(subscribe.remainingTimeText(), '长期有效');
     expect(
       subscribe.normalizedExpiredAt(),

@@ -207,7 +207,7 @@ class DickServiceSubscribe {
   }
 
   bool shouldWarnTrafficReset() {
-    return transferEnable > 0 && remainingTrafficRatio() < 0.1;
+    return transferEnable > 0 && remainingTrafficRatio() <= 0.1;
   }
 
   bool shouldWarnRenewal() {

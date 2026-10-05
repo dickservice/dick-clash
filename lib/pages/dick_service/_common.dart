@@ -1,5 +1,4 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:fl_clash/common/dick_service_models.dart';
 
 class DickServiceScaffold extends StatelessWidget {
   const DickServiceScaffold({
@@ -85,35 +84,6 @@ class DickServiceStateView extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class SubscribeSummary extends StatelessWidget {
-  const SubscribeSummary({super.key, required this.subscribe});
-  final DickServiceSubscribe subscribe;
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = subscribe.remainingTrafficRatio().clamp(0.0, 1.0);
-    return DickServicePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            subscribe.planName,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Text('剩余时间：${subscribe.remainingTimeText()}'),
-          const SizedBox(height: 8),
-          Text(
-            '剩余流量：${subscribe.formattedRemainingTraffic} / ${subscribe.formattedTotalTraffic}',
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(value: ratio),
-        ],
       ),
     );
   }
