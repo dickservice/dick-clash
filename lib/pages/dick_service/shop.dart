@@ -69,10 +69,11 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
               title: '暂无可购买套餐',
             );
           }
-          return ListView.builder(
+          return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             itemCount: plans.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (_, i) =>
                 _PlanCard(plan: plans[i], onBuy: () => _openPurchase(plans[i])),
           );
@@ -97,6 +98,7 @@ class _PlanCard extends StatelessWidget {
   final VoidCallback onBuy;
   @override
   Widget build(BuildContext context) => DickServicePanel(
+    margin: EdgeInsets.zero,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

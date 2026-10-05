@@ -79,24 +79,28 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
               title: '暂无工单',
             );
           }
-          return ListView(
+          final tickets = snapshot.data!;
+          return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            children: [
-              for (final ticket in snapshot.data!)
-                DickServicePanel(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(child: Text('${ticket.level}')),
-                    title: Text(ticket.subject),
-                    subtitle: Text(
-                      '${ticket.replyStatusText}\n${ticket.createdAt}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Text(ticket.status == 0 ? '处理中' : '已关闭'),
+            itemCount: tickets.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (_, index) {
+              final ticket = tickets[index];
+              return DickServicePanel(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(child: Text('${ticket.level}')),
+                  title: Text(ticket.subject),
+                  subtitle: Text(
+                    '${ticket.replyStatusText}\n${ticket.createdAt}',
                   ),
+                  isThreeLine: true,
+                  trailing: Text(ticket.status == 0 ? '处理中' : '已关闭'),
                 ),
-            ],
+              );
+            },
           );
         },
       ),

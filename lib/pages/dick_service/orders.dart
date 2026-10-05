@@ -23,10 +23,11 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
     _reload();
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() {
       _future = _loadRows();
     });
+    await _future;
   }
 
   Future<List<DickServiceUserOrder>> _loadRows() async {
@@ -52,41 +53,45 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
         icon: const Icon(Icons.refresh),
       ),
     ],
-    body: FutureBuilder<List<DickServiceUserOrder>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return DickServiceStateView(
-            icon: Icons.receipt_long_outlined,
-            title: '订单加载失败',
-            detail: '${snapshot.error}',
-            onRetry: _reload,
-          );
-        }
-        if (snapshot.data!.isEmpty) {
-          return const DickServiceStateView(
-            icon: Icons.receipt_long_outlined,
-            title: '暂无订单',
-          );
-        }
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
+    body: RefreshIndicator(
+      onRefresh: _reload,
+      child: FutureBuilder<List<DickServiceUserOrder>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return DickServiceStateView(
+              icon: Icons.receipt_long_outlined,
+              title: '订单加载失败',
+              detail: '${snapshot.error}',
+              onRetry: _reload,
+            );
+          }
+          if (snapshot.data!.isEmpty) {
+            return const DickServiceStateView(
+              icon: Icons.receipt_long_outlined,
+              title: '暂无订单',
+            );
+          }
+          final orders = snapshot.data!;
+          return ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            children: [
-              for (final order in snapshot.data!)
-                _OrderCard(
-                  order: order,
-                  onPay: () => _pay(order),
-                  onCancel: () => _cancel(order),
-                ),
-            ],
-          ),
-        );
-      },
+            itemCount: orders.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (_, index) {
+              final order = orders[index];
+              return _OrderCard(
+                order: order,
+                onPay: () => _pay(order),
+                onCancel: () => _cancel(order),
+              );
+            },
+          );
+        },
+      ),
     ),
   );
   Future<String> _token() async {
@@ -109,7 +114,7 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
           checkout: checkout,
           tradeNo: order.tradeNo,
         );
-        if (mounted) _reload();
+        if (mounted) await _reload();
       }
     } catch (error) {
       if (mounted) {
@@ -141,7 +146,7 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
     if (confirmed != true) return;
     try {
       await _api.cancelOrder(await _token(), order.tradeNo);
-      if (mounted) _reload();
+      if (mounted) await _reload();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -170,6 +175,7 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DickServicePanel(
+    margin: EdgeInsets.zero,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
