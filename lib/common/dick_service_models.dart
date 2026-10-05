@@ -74,7 +74,8 @@ class DickServiceTicket {
     final status = _intValue(json['status']);
     final replyStatus = _intValue(json['reply_status']);
     final level = _intValue(json['level']);
-    final updatedAt = _stringValue(json['updated_at']);
+    final createdAt = json['created_at']?.toString();
+    final updatedAt = _stringValue(json['updated_at'] ?? createdAt);
     return DickServiceTicket(
       subject: subject,
       status: status,

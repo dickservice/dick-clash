@@ -382,6 +382,7 @@ void main() {
     );
     expect(DickServiceTicket.fromJson({'subject': ''}).subject, '');
     expect(DickServiceTicket.fromJson({'subject': 42}).subject, '42');
+    expect(DickServiceTicket.fromJson({'created_at': 123}).updatedAt, '123');
     expect(
       DickServiceTicket.fromJson({
         'created_at': 'old',

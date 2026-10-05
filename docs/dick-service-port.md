@@ -173,6 +173,9 @@ This document now records the current workdir
 - User-order `period` remains nullable and is stringified only when present,
   matching `DickServiceUserOrder.fromJson` at `0x90e208..0x90e27c`; the order
   card omits a null or empty period instead of normalizing the model to `''`.
+- Ticket display time follows the APK factory fallback: stringify
+  `created_at`, then use stringified `updated_at` when present, otherwise the
+  created value (`0x9209a4..0x920a90`).
 - Expiry refresh preserves the AOT control flow at `0x685a50..0x685ec0`:
   concurrent checks return instead of queuing a forced retry; a fetch failure
   reloads the cache and is otherwise swallowed; and a refreshed subscription
