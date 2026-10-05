@@ -381,6 +381,22 @@ void main() {
     expect(userOrder.tradeNo, '42');
     expect(userOrder.planName, 'Nested plan');
     expect(DickServiceOrder.fromJson({'id': 43}).tradeNo, '43');
+    expect(
+      DickServiceUserOrder.fromJson({'status': '1.5'}).status,
+      0,
+      reason: 'AOT _intValue at 0x686ff0 uses int.tryParse only',
+    );
+    expect(
+      DickServiceSubscribe.fromJson({'plan_id': -7}).planId,
+      -7,
+      reason:
+          'AOT _firstPositiveInt at 0x6872b8 preserves the first non-null '
+          'value when neither candidate is positive',
+    );
+    expect(
+      DickServiceSubscribe.fromJson({'plan_id': -7}, {'plan_id': 9}).planId,
+      9,
+    );
   });
 
   test('checkout rejects malformed payload with service error', () {

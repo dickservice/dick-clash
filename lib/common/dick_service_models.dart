@@ -7,7 +7,7 @@ int _intValue(dynamic v) {
   if (v is int) return v;
   if (v is double) return v.toInt();
   if (v is num) return v.toInt();
-  if (v is String) return num.tryParse(v.trim())?.toInt() ?? 0;
+  if (v is String) return int.tryParse(v) ?? 0;
   return 0;
 }
 
@@ -31,9 +31,11 @@ int? _firstNullableInt(Map a, Map? b, String key) {
 }
 
 int _firstPositiveInt(Map a, Map? b, String key) {
-  final v = _firstNullableInt(a, b, key);
-  if (v == null || v <= 0) return 0;
-  return v;
+  final av = _nullableInt(a[key]);
+  if (av != null && av > 0) return av;
+  final bv = _nullableInt(b == null ? null : b[key]);
+  if (bv != null && bv > 0) return bv;
+  return av ?? bv ?? 0;
 }
 
 Map<String, dynamic>? _firstMap(Map a, Map? b, String key) {

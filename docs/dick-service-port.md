@@ -154,6 +154,11 @@ This document now records the current workdir
   integer coercion (`0x686d24..0x686ea0`); Mine then uses that field as the
   traffic-reset order price (`0x8b2f5c`). A root-level `prices` map and
   `plan.prices.reset_price` are ignored.
+- Numeric coercion preserves the APK split: general `_intValue` accepts
+  integer strings only (`0x686ff0`), while nullable subscription fields may
+  fall back through double parsing (`0x6871b4..0x6871c4`). The plan-ID helper
+  prefers a positive candidate but retains the first non-null non-positive
+  value when neither candidate is positive (`0x687230..0x6872e8`).
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
