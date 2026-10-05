@@ -12,23 +12,17 @@ const kDickServiceBoundSubscribeUrl =
 /// SharedPreferences key where login saves raw auth JSON/string
 const kDickServiceAuthDataKey = 'dick_service_auth_data';
 
-/// Pure predicate for the AOT logout reconciliation helper.
-/// AOT fetches the current subscription URL before deleting profiles
-/// (0x8b40cc / 0x8b41d4 -> 0x8b42d0 iterator / 0x8b5298 predicate).
-/// The exact predicate (static marker vs URL equality vs both) is not yet
-/// fully recovered, so callers must pass both signals explicitly; no
-/// deletion decisions are made inside the API/profile layer itself.
+/// Exact AOT logout predicate (`0x8b5298`): compare the profile URL with the
+/// subscription URL fetched from the current auth data. The closure loads the
+/// captured URL and the profile's `url` field, then performs `==`; it does not
+/// consult the static bound-marker URL.
 bool shouldRemoveDickServiceProfileOnLogout({
   required Profile profile,
   required String? resolvedSubscribeUrl,
 }) {
-  if (profile.isDickServiceBound) return true;
-  if (resolvedSubscribeUrl != null &&
+  return resolvedSubscribeUrl != null &&
       resolvedSubscribeUrl.isNotEmpty &&
-      profile.url == resolvedSubscribeUrl) {
-    return true;
-  }
-  return false;
+      profile.url == resolvedSubscribeUrl;
 }
 
 extension DickServiceProfileExtension on Profile {

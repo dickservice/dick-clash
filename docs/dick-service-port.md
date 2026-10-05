@@ -13,12 +13,11 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete profile predicate used during logout. Those items
 remain explicitly unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (pending current commit)
+## Integrated audit checkpoint (a979e7c)
 
-The current workdir adds the verified page/lifecycle parity changes listed below.
-The commit hash will be filled by the repository history after this checkpoint is
-committed and pushed. Focused tests passed; full analyzer retains only the
-pre-existing `prefer_const_constructors` info in
+The verified page/lifecycle parity batch was committed and pushed as `a979e7c`
+(`fix: align Dick Service pages and lifecycle with APK`). Focused tests passed;
+full analyzer retains only the pre-existing `prefer_const_constructors` info in
 `test/widgets/scrollbar_inset_test.dart:18:24`.
 
 ## Previous integrated audit checkpoint (5e9c9d6)
