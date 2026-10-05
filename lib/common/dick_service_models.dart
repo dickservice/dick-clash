@@ -212,9 +212,9 @@ class DickServiceSubscribe {
 
   bool shouldWarnRenewal() {
     if (expiredAt <= 0) return false;
-    final rem = expiredAt * 1000 - DateTime.now().millisecondsSinceEpoch;
-    // warn within 3 days
-    return rem > 0 && rem < 3 * 24 * 3600 * 1000;
+    final remaining = expireTime()!.difference(DateTime.now());
+    if (remaining.isNegative) return false;
+    return remaining.inDays <= 3;
   }
 
   String remainingTimeText() {
@@ -236,7 +236,7 @@ class DickServiceSubscribe {
       d /= 1024;
       i++;
     }
-    final decimals = d == d.truncateToDouble() ? 0 : 1;
+    final decimals = d >= 100 || d == d.roundToDouble() ? 0 : 1;
     return '${d.toStringAsFixed(decimals)}${units[i]}';
   }
 

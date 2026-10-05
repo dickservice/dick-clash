@@ -201,6 +201,45 @@ void main() {
       isTrue,
       reason: 'AOT 0x88c8fc and 0xab13f0 include the exact 10% boundary',
     );
+    final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    expect(
+      DickServiceSubscribe(
+        planName: 'Renewal threshold',
+        hasActivePlan: true,
+        expiredAt: nowSeconds + 3 * 24 * 3600 + 12 * 3600,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 1,
+      ).shouldWarnRenewal(),
+      isTrue,
+      reason: 'AOT 0x88cdb8 compares truncated inDays <= 3',
+    );
+    expect(
+      DickServiceSubscribe(
+        planName: 'Outside renewal threshold',
+        hasActivePlan: true,
+        expiredAt: nowSeconds + 4 * 24 * 3600 + 3600,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 1,
+      ).shouldWarnRenewal(),
+      isFalse,
+    );
+    expect(
+      const DickServiceSubscribe(
+        planName: 'Traffic formatting',
+        hasActivePlan: true,
+        expiredAt: 0,
+        transferEnable: 102912,
+        u: 0,
+        d: 0,
+        planId: 1,
+      ).formattedTotalTraffic,
+      '101KB',
+      reason: 'AOT 0xab0bf8 uses zero decimals from 100 units upward',
+    );
     expect(subscribe.remainingTimeText(), '长期有效');
     expect(
       subscribe.normalizedExpiredAt(),
