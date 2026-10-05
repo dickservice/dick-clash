@@ -190,6 +190,37 @@ void main() {
     expect(subscribe.shouldWarnTrafficReset(), isFalse);
     expect(subscribe.remainingTimeText(), '长期有效');
     expect(
+      subscribe.normalizedExpiredAt(),
+      -1,
+      reason: 'AOT 0x6865f8 normalizes an active plan without expiry',
+    );
+    expect(
+      const DickServiceSubscribe(
+        planName: 'No plan',
+        hasActivePlan: false,
+        expiredAt: 0,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 0,
+      ).normalizedExpiredAt(),
+      0,
+      reason: 'AOT preserves non-positive expiry when no plan is active',
+    );
+    expect(
+      const DickServiceSubscribe(
+        planName: 'No plan',
+        hasActivePlan: false,
+        expiredAt: -7,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 0,
+      ).normalizedExpiredAt(),
+      -7,
+      reason: 'AOT preserves negative expiry when no plan is active',
+    );
+    expect(
       const DickServiceSubscribe(
         planName: 'Plan',
         hasActivePlan: true,

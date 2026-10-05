@@ -171,8 +171,8 @@ class DickServiceSubscribe {
   }
 
   int normalizedExpiredAt() {
-    // AOT 0x6865f8: tbnz hasActivePlan(#4) -> return expiredAt;
-    // otherwise if hasActivePlan && expiredAt <= 0 -> -1 else expiredAt.
+    // AOT 0x6865f8: no active plan returns expiredAt unchanged; an active
+    // plan with a non-positive expiry is normalized to -1.
     if (hasActivePlan && expiredAt <= 0) return -1;
     return expiredAt;
   }
