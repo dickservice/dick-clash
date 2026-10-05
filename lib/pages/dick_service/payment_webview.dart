@@ -22,6 +22,7 @@ class _DickServicePaymentWebViewPageState
     extends State<DickServicePaymentWebViewPage> {
   late final WebViewController _controller;
   bool _canGoBack = false;
+  int _progress = 0;
 
   @override
   void initState() {
@@ -38,6 +39,9 @@ class _DickServicePaymentWebViewPageState
             }
             dialogs.openUrl(request.url);
             return NavigationDecision.prevent;
+          },
+          onProgress: (progress) {
+            setState(() => _progress = progress);
           },
           onPageFinished: (_) => _updateCanGoBack(),
         ),
@@ -89,7 +93,12 @@ class _DickServicePaymentWebViewPageState
           icon: const Icon(Icons.close),
         ),
       ],
-      body: WebViewWidget(controller: _controller),
+      body: Column(
+        children: [
+          if (_progress < 100) LinearProgressIndicator(value: _progress / 100),
+          Expanded(child: WebViewWidget(controller: _controller)),
+        ],
+      ),
     ),
   );
 }

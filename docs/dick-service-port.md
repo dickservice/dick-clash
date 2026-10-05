@@ -149,6 +149,9 @@ This document now records the current workdir
   ticket create, and reset-security are implemented.
 - Checkout response parsing supports URL and HTML branches without issuing an
   unverified payment request, preserving `支付链接返回为空`.
+- The payment WebView reports navigation progress into state and renders a
+  determinate `LinearProgressIndicator` while progress is below 100
+  (`0x985268..0x985324`, `0x90efe4..0x90f088`).
 - The APK has one subscription reset-price field. Its intentionally preserved
   lookup is `plan.prices.reset_traffic ?? plan.reset_price`, followed by
   integer coercion (`0x686d24..0x686ea0`); Mine then uses that field as the
