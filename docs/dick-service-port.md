@@ -13,7 +13,7 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete native/device behavior. Those items remain explicitly
 unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (53df5fb)
+## Integrated audit checkpoint (dab78a2)
 
 The verified page/lifecycle parity batch was committed and pushed as `a979e7c`
 (`fix: align Dick Service pages and lifecycle with APK`). The exact AOT logout
@@ -21,6 +21,32 @@ predicate was aligned in `8cd7bce`: remove only profiles whose URL equals the
 URL returned by `fetchSubscribeUrlFromAuthData`. The cache rollback-lock correction was committed as `53df5fb`: both an invalid
 signature and a clock rollback greater than 60 seconds persist
 `dick_service_expired_lock=true`, exactly matching AOT `0x687a88–0x687ab0`.
+
+Subsequent verified page/model checkpoints are now integrated through
+`dab78a2`:
+
+- `7e469c7`–`af678a3`: separated page lists, empty/error actions, Shop
+  navigation, and order payment/cancellation loading states.
+- `8cae4d2`: Mine renewal alerts include `remainingTimeText()`.
+- `8170f8d`: Mine uses the APK card hierarchy: plan summary, conditional
+  account alert, traffic card, and three-item account action card. The exact
+  10% traffic-warning boundary and two-stage reset-subscription confirmation
+  are restored.
+- `784b48a`: ticket list and creation submit share the AOT `_authData`
+  callback and missing-auth guidance.
+- `e250526`: Dick Service empty/error views are `ListView` based and strip the
+  leading `Exception: ` exactly like the APK, preserving pull-to-refresh on
+  short content.
+- `fdf1ed4`: renewal uses non-negative `Duration.inDays <= 3`, and traffic
+  formatting switches to zero decimals at 100 units, matching AOT
+  `0x88cdb8` and `0xab0bf8`.
+- `dab78a2`: expiry-time equality counts as expired and negative expiry values
+  map to the Unix epoch, matching `0x685fa0` and `0x685ff8`.
+
+The focused Dick Service API/cache/script suites pass 18 tests after these
+changes, targeted analysis is clean, both native asset hooks are restored to
+`true`, and the rule asset hash remains unchanged. This is still static
+evidence-supported parity rather than release/device or signed-binary parity.
 
 ## Previous integrated audit checkpoint (5e9c9d6)
 
