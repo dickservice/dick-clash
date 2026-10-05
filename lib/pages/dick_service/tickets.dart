@@ -172,6 +172,8 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Text('新建工单', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
           TextField(
             controller: _subject,
             decoration: const InputDecoration(labelText: '工单标题'),

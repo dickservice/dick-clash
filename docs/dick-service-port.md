@@ -149,12 +149,10 @@ This document now records the current workdir
 
 ## Known provenance conflicts and residual gaps
 
-- **About core link:** Dick AOT About closure at `0xab7774` opens
-  `https://github.com/chen08209/Clash.Meta/tree/FlClash` (`0xab7a70`), while
-  this fork opens `https://github.com/dickservice/dick-clash`. Telegram and
-  project/updater are independently confirmed and ported. The core-link
-  mismatch is recorded as APK/source provenance conflict and is not silently
-  rewritten without establishing the authoritative build revision.
+- **About core link:** The fork now follows the APK closure at `0xab7774`
+  and opens `https://github.com/chen08209/Clash.Meta/tree/FlClash`
+  (`0xab7a70`). This changes only the displayed Core link, not the native
+  core revision. Project/updater retain `dickservice/dick-clash`.
 - **Logout URL reconciliation:** AOT Mine `_logout` (`0x8b40cc`) fetches the
   subscription URL and iterates profiles; the fork keeps strict static-bound
   matching until the predicate `0x8b5298` is captured from runtime/AOT detail.

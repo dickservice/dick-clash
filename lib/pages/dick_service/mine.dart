@@ -43,7 +43,9 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
   Future<DickServiceSubscribe> _loadSubscribe() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-    if (token == null || token.isEmpty) throw StateError('登录 Dick Service');
+    if (token == null || token.isEmpty) {
+      throw StateError('请先在商城登录/购买一次，再查看我的套餐');
+    }
     return _api.fetchSubscribe(token);
   }
 
@@ -82,7 +84,12 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Text('当前套餐', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
               SubscribeSummary(subscribe: subscribe),
+              Text('已用：${subscribe.formattedUsedTraffic}'),
+              Text('总量：${subscribe.formattedTotalTraffic}'),
+              const SizedBox(height: 12),
               DickServicePanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
