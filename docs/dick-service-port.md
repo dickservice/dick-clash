@@ -13,12 +13,15 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete profile predicate used during logout. Those items
 remain explicitly unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (c25c2cb)
+## Integrated audit checkpoint (5e9c9d6)
 
-The previous integrated checkpoint was committed and pushed as `c25c2cb`:
+The previous integrated checkpoint was committed and pushed as `5e9c9d6`
+(`fix: align Dick Service gate/logout/orders with AOT evidence`):
 
-- `HEAD == origin/main == c25c2cb` at that checkpoint.
-- The integrated API/cache/script/database suite passed 61 tests.
+- `HEAD == origin/main == 5e9c9d6` at that checkpoint.
+- Focused Dick Service suites passed 17–18 tests
+  (`dick_service_api` / `dick_service_expiry_cache` / `dick_service_script`)
+  with the same asset-hook protocol.
 - Native asset hooks (`hooks.user_defines.setup.build_assets` and
   `hooks.user_defines.rust_api.build_assets`) were temporarily disabled for
   Dart tests and restored to `true` afterward; this is not an Android
@@ -29,10 +32,16 @@ The previous integrated checkpoint was committed and pushed as `c25c2cb`:
   with SHA-256
   `d2b761ac9b854c16fe4df2108e1c34c3fd889d7a55c867a306227de8aa0df55c`.
 
-After that checkpoint, a residual AOT audit identified a small API/model/test
-correction set (login error mapping, plan fetch, strict list conversion,
-subscribe reset provenance). Those edits are included below and verified by
-the updated test suite before this checkpoint is treated as verified.
+The earlier `c25c2cb` checkpoint had the broader 61-test integration suite.
+Since then the residual audit corrections (login error mapping
+`0x88ba8c` 401/422, plan fetch without `_throwIfFailed` `0x8b631c`, strict
+`Map.from` list conversion, `plan.prices`-only reset provenance
+`0x6867a4`, and logout/profile gate alignment) were integrated and verified
+before `5e9c9d6` was pushed.
+
+This document now records the current workdir
+`/root/.openclaw/workspace/work/flclash-diff/fork` (the previously cited
+`/root/.openclaw/work/flclash-diff/fork` was invalid).
 
 ## Implemented from AOT
 
@@ -151,7 +160,10 @@ the updated test suite before this checkpoint is treated as verified.
   matching until the predicate `0x8b5298` is captured from runtime/AOT detail.
 - **Bootstrap/expiry:** exact warning strings/ordering, timer interval
   literal, offline grace, and core-stop operation (`handleExit` candidate)
-  remain unverified.
+  remain unverified. Bootstrap completion itself is now
+  `bootstrap_done || hasDickServiceBound` per `0x97ad58` (auth only gates
+  `_checkAccountStatus` at `0x97ad44`), and `normalizedExpiredAt` `0x6865f8`
+  is `hasActivePlan && expiredAt<=0 ? -1 : expiredAt` (seconds).
 - **Pagination/token refresh/payment callbacks/polling** remain unimplemented.
 
 ## Native residual audit (read-only)
@@ -208,6 +220,12 @@ Before accepting the residual API patch as the new verified checkpoint:
 4. Recheck `dick_rule.js` size and SHA-256.
 5. Review `git diff --stat`, commit, push `main`, and verify a clean worktree
    with `HEAD == origin/main`.
+
+Current AOT anchor addresses: `normalizedExpiredAt 0x6865f8`,
+`isTimeBasedExpired 0x685f34`, `expireTime 0x685fdc`, `isExpired 0x685ecc`,
+`shouldWarnTrafficReset 0x88cbe4`, `shouldWarnRenewal 0x88cd38`,
+bootstrap `_load 0x97abd8` / closure `0x97ad58` / build `0x889464`,
+`fetchSubscribeUrlFromAuthData 0x67a64c`, `isDickServiceBound 0x67bb44`.
 
 Evidence is retained in:
 

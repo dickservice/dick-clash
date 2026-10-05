@@ -37,19 +37,13 @@ class _BootstrapGateState extends ConsumerState<DickServiceBootstrapGate> {
     final profiles = ref.read(profilesProvider);
     final auth = prefs?.getString(kDickServiceAuthDataKey);
     setState(() {
-      // AOT _load (0x97abd8) reads dick_service_auth_data and the
-      // completion closure reads bootstrap_done/profile state; the exact
-      // OR/AND table is not fully recovered, so keep the gate closed
-      // when auth is absent — stale bootstrap_done or a lingering bound
-      // profile alone must not bypass login (see audit-api-lifecycle P1).
+      // AOT _load 0x97abd8 / closure 0x97ad58: _complete is
+      // bootstrapDone || profiles.hasDickServiceBound. Auth presence only
+      // gates the subsequent _checkAccountStatus call, not completion itself
+      // (auth-empty still clears the loading state via the closure).
       final bootstrapDone =
           prefs?.getBool(DickServiceExpiryCacheStore.kBootstrapDone) ?? false;
-      final hasAuth = auth != null && auth.isNotEmpty;
-      if (!hasAuth) {
-        _complete = false;
-      } else {
-        _complete = bootstrapDone || profiles.hasDickServiceBound;
-      }
+      _complete = bootstrapDone || profiles.hasDickServiceBound;
     });
     if (auth != null && auth.isNotEmpty && prefs != null) {
       unawaited(_checkAccountStatus(prefs, auth));
