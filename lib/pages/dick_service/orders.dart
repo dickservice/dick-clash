@@ -209,7 +209,8 @@ class _OrderCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text('订单号：${order.tradeNo}'),
-        if (order.period.isNotEmpty) Text(order.period),
+        if (order.period case final period? when period.isNotEmpty)
+          Text(period),
         const SizedBox(height: 8),
         Row(
           children: [

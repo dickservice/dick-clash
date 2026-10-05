@@ -401,6 +401,8 @@ void main() {
     });
     expect(userOrder.tradeNo, '42');
     expect(userOrder.planName, 'Nested plan');
+    expect(userOrder.period, isNull);
+    expect(DickServiceUserOrder.fromJson({'period': 30}).period, '30');
     expect(DickServiceOrder.fromJson({'id': 43}).tradeNo, '43');
     expect(
       DickServiceUserOrder.fromJson({'status': '1.5'}).status,

@@ -279,7 +279,7 @@ class DickServiceUserOrder {
   final String tradeNo;
   final int status;
   final int totalAmount;
-  final String period;
+  final String? period;
   final String createdAt;
 
   const DickServiceUserOrder({
@@ -305,7 +305,7 @@ class DickServiceUserOrder {
     final totalAmount = _intValue(
       json['total_amount'] ?? json['totalAmount'] ?? json['amount'],
     );
-    final period = _stringValue(json['period']);
+    final period = json['period']?.toString();
     final createdAt = _stringValue(json['created_at'] ?? json['createdAt']);
     return DickServiceUserOrder(
       planName: planName,

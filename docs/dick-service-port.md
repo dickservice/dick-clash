@@ -170,6 +170,9 @@ This document now records the current workdir
   subsequent `/api/v1/user/info` fetch in the APK's broad catch and passes
   `null` account info to `DickServiceSubscribe.fromJson` on failure
   (`0x686710..0x686794`).
+- User-order `period` remains nullable and is stringified only when present,
+  matching `DickServiceUserOrder.fromJson` at `0x90e208..0x90e27c`; the order
+  card omits a null or empty period instead of normalizing the model to `''`.
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
