@@ -177,6 +177,11 @@ This document now records the current workdir
   concurrent checks return instead of queuing a forced retry; a fetch failure
   reloads the cache and is otherwise swallowed; and a refreshed subscription
   uses full `isExpired` semantics, including no active plan.
+- Expiry-gate startup registers the initial check as a post-frame callback
+  before creating the periodic timer (`0x973b50..0x973c60`). The timer duration
+  object `Duration@c14d31` is `1,800,000,000µs` (30 minutes). Disposal removes
+  the lifecycle observer and cancels that timer without closing the API client
+  (`0x99a6bc..0x99a718`).
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict

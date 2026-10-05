@@ -133,11 +133,13 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_checkSubscription()),
+    );
     _timer = Timer.periodic(
       const Duration(minutes: 30),
       (_) => unawaited(_checkSubscription()),
     );
-    unawaited(_checkSubscription());
   }
 
   @override
@@ -292,7 +294,6 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
-    if (widget.api == null) _api.dio.close();
     super.dispose();
   }
 }
