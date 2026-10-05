@@ -30,10 +30,16 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
   }
 
   Future<List<DickServiceTicket>> _loadRows() async {
+    return _api.fetchTickets(await _authData());
+  }
+
+  Future<String> _authData() async {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-    if (token == null || token.isEmpty) throw StateError('请先在商城登录/购买一次，再查看工单');
-    return _api.fetchTickets(token);
+    if (token == null || token.isEmpty) {
+      throw StateError('请先在商城登录/购买一次，再查看工单');
+    }
+    return token;
   }
 
   @override
@@ -114,16 +120,16 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _CreateTicketSheet(api: _api, token: widget.token),
+      builder: (_) => _CreateTicketSheet(api: _api, authData: _authData),
     );
     if (created == true && mounted) await _reload();
   }
 }
 
 class _CreateTicketSheet extends StatefulWidget {
-  const _CreateTicketSheet({required this.api, this.token});
+  const _CreateTicketSheet({required this.api, required this.authData});
   final DickServiceApi api;
-  final String? token;
+  final Future<String> Function() authData;
 
   @override
   State<_CreateTicketSheet> createState() => _CreateTicketSheetState();
@@ -155,11 +161,8 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
       _error = null;
     });
     try {
-      final prefs = await preferences.sharedPreferencesCompleter.future;
-      final token = widget.token ?? prefs?.getString(kDickServiceAuthDataKey);
-      if (token == null || token.isEmpty) throw StateError('请先登录 Dick Service');
       await widget.api.createTicket(
-        token,
+        await widget.authData(),
         level: _level,
         message: message,
         subject: subject,
