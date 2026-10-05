@@ -57,34 +57,35 @@ class DickServiceStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            if (detail != null) ...[
-              const SizedBox(height: 8),
-              Text(detail!, textAlign: TextAlign.center),
-            ],
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: Text(retryLabel ?? '刷新'),
-              ),
-            ],
-          ],
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 32),
+        Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      ),
+        if (detail != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            detail!.replaceFirst('Exception: ', ''),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (onRetry != null) ...[
+          const SizedBox(height: 16),
+          Center(
+            child: FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: Text(retryLabel ?? '刷新'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
