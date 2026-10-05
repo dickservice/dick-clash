@@ -114,21 +114,11 @@ class DickServiceApi {
           throw Exception(_invalidCredentials);
         }
         lastError = error;
-      } on Exception catch (error) {
-        if (error.toString().contains(_invalidCredentials)) {
-          rethrow;
-        }
-        // Preserve AOT server message / missing auth errors; do not swallow
-        // into the generic endpoint-exhaustion message.
-        rethrow;
+      } catch (error) {
+        lastError = error;
       }
     }
-    if (lastError != null) {
-      // Keep the original network/protocol error visible while preserving
-      // the AOT exhaustion wording for the single-candidate case.
-      throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$endpoints ($lastError)');
-    }
-    throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$endpoints');
+    throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$lastError');
   }
 
   Future<List<DickServiceUserOrder>> fetchOrders(String token) async {
@@ -332,7 +322,7 @@ class DickServiceApi {
   static Map<String, dynamic> _asMap(dynamic v) {
     if (v is Map<String, dynamic>) return v;
     if (v is Map) return Map<String, dynamic>.from(v);
-    throw Exception(v is String && v.contains('入口 ') ? v : '返回格式异常');
+    throw Exception('入口 ${v is String ? '返回了验证页面' : '返回格式异常'}，继续尝试下一个入口');
   }
 
   static void _throwIfFailed(Map<String, dynamic> m) {
@@ -401,18 +391,6 @@ class DickServiceApi {
           final u = _findUrl(val);
           if (u != null) return u;
         }
-        if (val is List) {
-          for (final e in val) {
-            final u = _findUrl(e);
-            if (u != null) return u;
-          }
-        }
-      }
-    }
-    if (v is List) {
-      for (final e in v) {
-        final u = _findUrl(e);
-        if (u != null) return u;
       }
     }
     return null;
@@ -437,15 +415,10 @@ class DickServiceApi {
         if (candidate is String && candidate.isNotEmpty) return candidate;
       }
       for (final candidate in value.values) {
-        if (candidate is Map || candidate is List) {
+        if (candidate is Map) {
           final result = _findAuthData(candidate);
           if (result != null) return result;
         }
-      }
-    } else if (value is List) {
-      for (final candidate in value) {
-        final result = _findAuthData(candidate);
-        if (result != null) return result;
       }
     }
     return null;
@@ -460,12 +433,6 @@ class DickServiceApi {
       }
       for (final val in v.values) {
         final h = _findHtml(val);
-        if (h != null) return h;
-      }
-    }
-    if (v is List) {
-      for (final e in v) {
-        final h = _findHtml(e);
         if (h != null) return h;
       }
     }

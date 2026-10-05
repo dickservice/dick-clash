@@ -159,6 +159,13 @@ This document now records the current workdir
   fall back through double parsing (`0x6871b4..0x6871c4`). The plan-ID helper
   prefers a positive candidate but retains the first non-null non-positive
   value when neither candidate is positive (`0x687230..0x6872e8`).
+- Login preserves the AOT exhaustion path (`0x88ba8c..0x88bb78`): only HTTP
+  401/422 immediately become `账号或密码错误`; every other thrown value is kept
+  as `lastError`, and the final message appends that value without an endpoint
+  list. `_asMap` also keeps the APK's validation-page/format error wording
+  (`0x67adfc..0x67afec`). Recursive auth, URL, and checkout-HTML lookup walks
+  maps but intentionally does not descend into lists (`0x67a78c`, `0x88be9c`,
+  `0x8b3634`).
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict

@@ -406,6 +406,17 @@ void main() {
       }),
       throwsA(predicate((error) => error.toString().contains('支付链接返回为空'))),
     );
+    expect(
+      () => DickServiceApi.parseCheckoutResponse({
+        'data': {
+          'nested': [
+            {'url': 'https://pay.example/must-not-be-found'},
+          ],
+        },
+      }),
+      throwsA(predicate((error) => error.toString().contains('支付链接返回为空'))),
+      reason: 'AOT map recursion does not descend into list values',
+    );
   });
 
   test('signature nonce is UUID v4 formatted', () async {
@@ -461,6 +472,57 @@ void main() {
       api.login('mail@example.com', 'secret'),
       throwsA(predicate((error) => error.toString().contains('账号或密码错误'))),
     );
+    dio.close();
+  });
+
+  test(
+    'login wraps non-credential failures after exhausting endpoints',
+    () async {
+      final adapter = _Adapter(
+        responses: {DickServiceApi.epLogin: const <String, Object?>{}},
+      );
+      final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
+        ..httpClientAdapter = adapter;
+      final api = DickServiceApi(dio: dio);
+      await expectLater(
+        api.login('mail@example.com', 'secret'),
+        throwsA(
+          predicate(
+            (error) =>
+                error.toString() ==
+                'Exception: 没有可用的 Dick Service 登录入口，请稍后重试：'
+                    'Exception: Login succeeded but auth data is missing',
+          ),
+        ),
+      );
+      dio.close();
+    },
+  );
+
+  test('login does not search list values for auth data', () async {
+    final adapter = _Adapter(
+      responses: {
+        DickServiceApi.epLogin: {
+          'nested': [
+            {'token': 'must-not-be-found'},
+          ],
+        },
+      },
+    );
+    final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
+      ..httpClientAdapter = adapter;
+    final api = DickServiceApi(dio: dio);
+    await expectLater(
+      api.login('mail@example.com', 'secret'),
+      throwsA(
+        predicate(
+          (error) => error.toString().contains(
+            'Login succeeded but auth data is missing',
+          ),
+        ),
+      ),
+    );
+    expect(adapter.requests, hasLength(1));
     dio.close();
   });
 
