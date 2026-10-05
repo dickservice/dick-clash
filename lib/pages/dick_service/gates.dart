@@ -170,6 +170,8 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
               ? '账号状态校验异常，请联网重新登录或续费后再使用'
               : '您的套餐已到期，请续费以继续使用',
         );
+      } else if (mounted && (_message != null || force)) {
+        setState(() => _message = null);
       }
       if (!cache.shouldRefresh(force: force)) return;
       final subscribe = await _api.fetchSubscribe(auth);

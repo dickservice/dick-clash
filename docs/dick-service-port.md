@@ -179,7 +179,9 @@ This document now records the current workdir
 - Expiry refresh preserves the AOT control flow at `0x685a50..0x685ec0`:
   concurrent checks return instead of queuing a forced retry; a fetch failure
   reloads the cache and is otherwise swallowed; and a refreshed subscription
-  uses full `isExpired` semantics, including no active plan.
+  uses full `isExpired` semantics, including no active plan. A valid,
+  non-expired cache clears any stale overlay before `shouldRefresh` can return
+  early (`0x685c60..0x685cc8`).
 - Expiry-gate startup registers the initial check as a post-frame callback
   before creating the periodic timer (`0x973b50..0x973c60`). The timer duration
   object `Duration@c14d31` is `1,800,000,000µs` (30 minutes). Disposal removes
