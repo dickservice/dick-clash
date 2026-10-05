@@ -210,41 +210,81 @@ class _ExpiryGateState extends ConsumerState<DickServiceExpiryGate>
 
   @override
   Widget build(BuildContext context) {
-    if (_message == null) return widget.child;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lock_clock,
-                  size: 52,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.45),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (_message != null)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: PopScope(
+                canPop: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Card(
+                      margin: const EdgeInsets.all(24),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lock_clock,
+                              size: 52,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.45),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '套餐已到期',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _message!,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.outline,
+                                  ),
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => ref
+                                        .read(systemActionProvider.notifier)
+                                        .handleExit(),
+                                    child: const Text('取消'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: _openRenewPage,
+                                    child: const Text('续费'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                const Text('套餐已到期'),
-                const SizedBox(height: 12),
-                Text(_message!, textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () =>
-                      ref.read(systemActionProvider.notifier).handleExit(),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: _openRenewPage,
-                  child: const Text('续费'),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 

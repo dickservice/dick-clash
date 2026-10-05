@@ -13,7 +13,15 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete profile predicate used during logout. Those items
 remain explicitly unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (5e9c9d6)
+## Integrated audit checkpoint (pending current commit)
+
+The current workdir adds the verified page/lifecycle parity changes listed below.
+The commit hash will be filled by the repository history after this checkpoint is
+committed and pushed. Focused tests passed; full analyzer retains only the
+pre-existing `prefer_const_constructors` info in
+`test/widgets/scrollbar_inset_test.dart:18:24`.
+
+## Previous integrated audit checkpoint (5e9c9d6)
 
 The previous integrated checkpoint was committed and pushed as `5e9c9d6`
 (`fix: align Dick Service gate/logout/orders with AOT evidence`):
@@ -44,6 +52,27 @@ This document now records the current workdir
 `/root/.openclaw/work/flclash-diff/fork` was invalid).
 
 ## Implemented from AOT
+
+### Current page and lifecycle alignment
+
+- Mine redemption is an AOT-style scroll-controlled modal bottom sheet: a
+  successful redemption shows the result, returns `true`, and Mine reloads the
+  subscription. The sheet uses the exact AOT explanatory text and loading text.
+- Shop and Tickets now use `RefreshIndicator` with always-scrollable content and
+  await their reload futures, matching the AOT pull-to-refresh interaction.
+- The purchase sheet is scrollable, shows the AOT `当前选择：<周期> · <价格>`
+  summary, uses `正在创建订单...`, and preserves the AOT missing-credential
+  text `请输入官网账号和密码`.
+- Mine now exposes AOT top-bar actions for `兑换码`, `退出登录`, and `刷新`,
+  and removes the duplicate Shop/Orders/Tickets body navigation controls.
+- The expiry gate keeps the original child under an opaque full-screen overlay,
+  prevents back navigation with `PopScope`, and routes `取消` through
+  `SystemAction.handleExit`, matching the reconstructed AOT widget structure.
+- Application disposal is asynchronous and follows the AOT cleanup order:
+  destroy links, cancel the profile timer, close the core, then invoke the exit
+  coordinator. The current fork's `close()` is the source-level equivalent of
+  the fork interface's core destruction operation.
+
 
 ### API and models (`lib/common/dick_service_api.dart`, `lib/common/dick_service_models.dart`)
 

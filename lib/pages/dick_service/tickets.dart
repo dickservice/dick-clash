@@ -22,10 +22,11 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
     _reload();
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() {
       _future = _loadRows();
     });
+    await _future;
   }
 
   Future<List<DickServiceTicket>> _loadRows() async {
@@ -56,45 +57,49 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
         icon: const Icon(Icons.refresh),
       ),
     ],
-    body: FutureBuilder<List<DickServiceTicket>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return DickServiceStateView(
-            icon: Icons.support_agent,
-            title: '工单加载失败',
-            detail: '${snapshot.error}',
-            onRetry: _reload,
-          );
-        }
-        if (snapshot.data!.isEmpty) {
-          return const DickServiceStateView(
-            icon: Icons.support_agent,
-            title: '暂无工单',
-          );
-        }
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            for (final ticket in snapshot.data!)
-              DickServicePanel(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(child: Text('${ticket.level}')),
-                  title: Text(ticket.subject),
-                  subtitle: Text(
-                    '${ticket.replyStatusText}\n${ticket.createdAt}',
+    body: RefreshIndicator(
+      onRefresh: _reload,
+      child: FutureBuilder<List<DickServiceTicket>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return DickServiceStateView(
+              icon: Icons.support_agent,
+              title: '工单加载失败',
+              detail: '${snapshot.error}',
+              onRetry: _reload,
+            );
+          }
+          if (snapshot.data!.isEmpty) {
+            return const DickServiceStateView(
+              icon: Icons.support_agent,
+              title: '暂无工单',
+            );
+          }
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              for (final ticket in snapshot.data!)
+                DickServicePanel(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(child: Text('${ticket.level}')),
+                    title: Text(ticket.subject),
+                    subtitle: Text(
+                      '${ticket.replyStatusText}\n${ticket.createdAt}',
+                    ),
+                    isThreeLine: true,
+                    trailing: Text(ticket.status == 0 ? '处理中' : '已关闭'),
                   ),
-                  isThreeLine: true,
-                  trailing: Text(ticket.status == 0 ? '处理中' : '已关闭'),
                 ),
-              ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     ),
   );
 
@@ -104,7 +109,7 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
       isScrollControlled: true,
       builder: (_) => _CreateTicketSheet(api: _api, token: widget.token),
     );
-    if (created == true && mounted) _reload();
+    if (created == true && mounted) await _reload();
   }
 }
 

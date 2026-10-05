@@ -197,9 +197,11 @@ class ApplicationState extends ConsumerState<Application> {
   }
 
   @override
-  void dispose() {
+  Future<void> dispose() async {
     linkManager.destroy();
     _autoUpdateProfilesTaskTimer?.cancel();
+    await ref.read(coreHandlerProvider).close();
+    await ref.read(systemActionProvider.notifier).handleExit();
     super.dispose();
   }
 }

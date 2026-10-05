@@ -23,10 +23,11 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
     _reload();
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() {
       _future = _api.fetchPlans();
     });
+    await _future;
   }
 
   @override
@@ -45,34 +46,38 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
         icon: const Icon(Icons.refresh),
       ),
     ],
-    body: FutureBuilder<List<DickServicePlan>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return DickServiceStateView(
-            icon: Icons.storefront_outlined,
-            title: '套餐加载失败',
-            detail: '${snapshot.error}',
-            onRetry: _reload,
+    body: RefreshIndicator(
+      onRefresh: _reload,
+      child: FutureBuilder<List<DickServicePlan>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return DickServiceStateView(
+              icon: Icons.storefront_outlined,
+              title: '套餐加载失败',
+              detail: '${snapshot.error}',
+              onRetry: _reload,
+            );
+          }
+          final plans = snapshot.data!;
+          if (plans.isEmpty) {
+            return const DickServiceStateView(
+              icon: Icons.inventory_2_outlined,
+              title: '暂无可购买套餐',
+            );
+          }
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: plans.length,
+            itemBuilder: (_, i) =>
+                _PlanCard(plan: plans[i], onBuy: () => _openPurchase(plans[i])),
           );
-        }
-        final plans = snapshot.data!;
-        if (plans.isEmpty) {
-          return const DickServiceStateView(
-            icon: Icons.inventory_2_outlined,
-            title: '暂无可购买套餐',
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: plans.length,
-          itemBuilder: (_, i) =>
-              _PlanCard(plan: plans[i], onBuy: () => _openPurchase(plans[i])),
-        );
-      },
+        },
+      ),
     ),
   );
 
@@ -182,7 +187,7 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
         final email = _email.text.trim();
         final password = _password.text;
         if (email.isEmpty || password.isEmpty) {
-          throw StateError('首次购买需要登录官网账号；请输入账号和密码');
+          throw StateError('请输入官网账号和密码');
         }
         final session = await widget.api.login(email, password);
         token = session.token;
@@ -228,70 +233,85 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
         20,
         MediaQuery.viewInsetsOf(context).bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(widget.plan.name, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<DickServicePriceOption>(
-            initialValue: _price,
-            decoration: const InputDecoration(labelText: '购买周期'),
-            items: [
-              for (final price in widget.plan.priceOptions)
-                DropdownMenuItem(
-                  value: price,
-                  child: Text(
-                    '${price.period ?? '--'} · ${price.formattedPrice}',
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.plan.name,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '当前选择：${_price.period ?? '--'} · ${_price.formattedPrice}',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<DickServicePriceOption>(
+              initialValue: _price,
+              decoration: const InputDecoration(labelText: '购买周期'),
+              items: [
+                for (final price in widget.plan.priceOptions)
+                  DropdownMenuItem(
+                    value: price,
+                    child: Text(
+                      '${price.period ?? '--'} · ${price.formattedPrice}',
+                    ),
                   ),
-                ),
-            ],
-            onChanged: _busy
-                ? null
-                : (value) => setState(() => _price = value!),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: _method,
-            decoration: const InputDecoration(labelText: '支付方式'),
-            items: const [
-              DropdownMenuItem(value: 1, child: Text('支付宝')),
-              DropdownMenuItem(value: 2, child: Text('微信')),
-              DropdownMenuItem(value: 3, child: Text('USDT')),
-            ],
-            onChanged: _busy
-                ? null
-                : (value) => setState(() => _method = value!),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '首次购买需要登录官网账号；登录成功后会保存授权，后续购买不再弹账号密码。',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: '账号（首次购买填写）'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: '密码（首次购买填写）'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _coupon,
-            decoration: const InputDecoration(labelText: '优惠码（可选）'),
-          ),
-          if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _busy ? null : _submit,
-            icon: const Icon(Icons.shopping_cart_checkout),
-            label: Text(_busy ? '处理中...' : '创建订单并打开支付'),
-          ),
-        ],
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _price = value!),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              initialValue: _method,
+              decoration: const InputDecoration(labelText: '支付方式'),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('支付宝')),
+                DropdownMenuItem(value: 2, child: Text('微信')),
+                DropdownMenuItem(value: 3, child: Text('USDT')),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _method = value!),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '首次购买需要登录官网账号；登录成功后会保存授权，后续购买不再弹账号密码。',
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: '账号（首次购买填写）'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '密码（首次购买填写）'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _coupon,
+              decoration: const InputDecoration(labelText: '优惠码（可选）'),
+            ),
+            if (_error != null) ...[const SizedBox(height: 12), Text(_error!)],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _busy ? null : _submit,
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: Text(_busy ? '正在创建订单...' : '创建订单并打开支付'),
+            ),
+          ],
+        ),
       ),
     ),
   );

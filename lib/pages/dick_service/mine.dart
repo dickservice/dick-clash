@@ -4,9 +4,6 @@ import 'package:fl_clash/common/dick_service_models.dart';
 import 'package:fl_clash/common/dick_service_expiry_cache.dart';
 import 'gift_card.dart';
 import 'login.dart';
-import 'orders.dart';
-import 'shop.dart';
-import 'tickets.dart';
 import '_common.dart';
 import 'package:fl_clash/common/preferences.dart';
 import 'package:fl_clash/common/dick_service_profile.dart';
@@ -50,6 +47,16 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     return _api.fetchSubscribe(token);
   }
 
+  Future<void> _redeemGiftCard() async {
+    final redeemed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const DickServiceGiftCardPage(),
+    );
+    if (redeemed == true && mounted) await _reload();
+  }
+
   @override
   void dispose() {
     _api.dio.close();
@@ -61,6 +68,16 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     return DickServiceScaffold(
       title: '我的',
       actions: [
+        IconButton(
+          onPressed: _redeemGiftCard,
+          tooltip: '兑换码',
+          icon: const Icon(Icons.card_giftcard),
+        ),
+        IconButton(
+          onPressed: _logout,
+          tooltip: '退出登录',
+          icon: const Icon(Icons.logout),
+        ),
         IconButton(
           onPressed: _reload,
           tooltip: '刷新',
@@ -116,51 +133,13 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const DickServiceLoginPage(),
-                          ),
-                        ),
-                        child: const Text('登录 Dick Service'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const DickServiceShopPage(),
-                          ),
-                        ),
-                        child: const Text('商城'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                DickServiceOrdersPage(token: widget.token),
-                          ),
-                        ),
-                        child: const Text('我的订单'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                DickServiceTicketsPage(token: widget.token),
-                          ),
-                        ),
-                        child: const Text('工单'),
-                      ),
                       Text(
                         '账户操作',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const DickServiceGiftCardPage(),
-                          ),
-                        ),
+                        onPressed: _redeemGiftCard,
                         icon: const Icon(Icons.card_giftcard),
                         label: const Text('兑换码兑换'),
                       ),
@@ -173,35 +152,6 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
                         onPressed: _resetSubscribe,
                         icon: const Icon(Icons.security_update_good),
                         label: const Text('重置订阅链接'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const DickServiceShopPage(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.shopping_bag),
-                        label: const Text('商城'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                DickServiceOrdersPage(token: widget.token),
-                          ),
-                        ),
-                        icon: const Icon(Icons.receipt_long),
-                        label: const Text('我的订单'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                DickServiceTicketsPage(token: widget.token),
-                          ),
-                        ),
-                        icon: const Icon(Icons.support_agent),
-                        label: const Text('工单'),
                       ),
                       TextButton.icon(
                         onPressed: _logout,

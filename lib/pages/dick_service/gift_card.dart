@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/common/common.dart';
-import '_common.dart';
 
 class DickServiceGiftCardPage extends StatefulWidget {
   const DickServiceGiftCardPage({super.key});
@@ -24,6 +23,7 @@ class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
   }
 
   Future<void> _redeem() async {
+    if (_busy) return;
     final code = _code.text.trim();
     if (code.isEmpty) {
       setState(() => _result = '请输入兑换码');
@@ -38,18 +38,10 @@ class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
       final token = prefs?.getString(kDickServiceAuthDataKey);
       if (token == null || token.isEmpty) throw StateError('登录已失效，请重新登录');
       final result = await _api.redeemGiftCard(token, code);
-      final subscribe = await _api.fetchSubscribe(token);
-      if (prefs != null) {
-        await DickServiceExpiryCacheStore(prefs).saveSubscribe(
-          DickServiceSubscribeCompat(
-            planName: subscribe.planName,
-            hasActivePlan: subscribe.hasActivePlan,
-            expiredAtMs: subscribe.normalizedExpiredAt(),
-            isExpired: subscribe.isExpired(),
-          ),
-        );
+      if (mounted) {
+        context.showSnackBar(result.summary);
+        Navigator.of(context).pop(true);
       }
-      if (mounted) setState(() => _result = result.summary);
     } catch (error) {
       if (mounted) setState(() => _result = compactError(error));
     } finally {
@@ -59,30 +51,59 @@ class _DickServiceGiftCardPageState extends State<DickServiceGiftCardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DickServiceScaffold(
-      title: '兑换码',
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Text('兑换码兑换', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          const Text('请输入兑换码'),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _code,
-            decoration: const InputDecoration(
-              labelText: '兑换码',
-              border: OutlineInputBorder(),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '兑换码兑换',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _busy ? null : _redeem,
-            icon: const Icon(Icons.card_giftcard),
-            label: Text(_busy ? '兑换中...' : '立即兑换'),
-          ),
-          if (_result != null) ...[const SizedBox(height: 12), Text(_result!)],
-        ],
+            const SizedBox(height: 8),
+            const Text('输入官网兑换码，兑换成功后会刷新当前套餐与流量信息。'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _code,
+              enabled: !_busy,
+              textCapitalization: TextCapitalization.characters,
+              onSubmitted: (_) => _redeem(),
+              decoration: const InputDecoration(
+                labelText: '兑换码',
+                prefixIcon: Icon(Icons.card_giftcard),
+              ),
+            ),
+            if (_result != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _result!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _busy ? null : _redeem,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.card_giftcard),
+              label: Text(_busy ? '正在兑换...' : '立即兑换'),
+            ),
+          ],
+        ),
       ),
     );
   }
