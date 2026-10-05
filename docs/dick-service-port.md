@@ -10,15 +10,17 @@ not executed on a device in this workspace.
 
 Static evidence does not establish pagination, token refresh, payment
 callback/polling, offline grace, exact core behavior, Firebase telemetry
-behavior, or the complete profile predicate used during logout. Those items
-remain explicitly unimplemented or marked unknown rather than guessed.
+behavior, or the complete native/device behavior. Those items remain explicitly
+unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (a979e7c)
+## Integrated audit checkpoint (53df5fb)
 
 The verified page/lifecycle parity batch was committed and pushed as `a979e7c`
-(`fix: align Dick Service pages and lifecycle with APK`). Focused tests passed;
-full analyzer retains only the pre-existing `prefer_const_constructors` info in
-`test/widgets/scrollbar_inset_test.dart:18:24`.
+(`fix: align Dick Service pages and lifecycle with APK`). The exact AOT logout
+predicate was aligned in `8cd7bce`: remove only profiles whose URL equals the
+URL returned by `fetchSubscribeUrlFromAuthData`. The cache rollback-lock correction was committed as `53df5fb`: both an invalid
+signature and a clock rollback greater than 60 seconds persist
+`dick_service_expired_lock=true`, exactly matching AOT `0x687a88–0x687ab0`.
 
 ## Previous integrated audit checkpoint (5e9c9d6)
 
@@ -182,11 +184,12 @@ This document now records the current workdir
   (`0xab7a70`). This changes only the displayed Core link, not the native
   core revision. Project/updater retain `dickservice/dick-clash`.
 - **Logout URL reconciliation:** AOT Mine `_logout` (`0x8b40cc`) fetches the
-  subscription URL and iterates profiles; the fork keeps strict static-bound
-  matching until the predicate `0x8b5298` is captured from runtime/AOT detail.
-- **Bootstrap/expiry:** exact warning strings/ordering, timer interval
-  literal, offline grace, and core-stop operation (`handleExit` candidate)
-  remain unverified. Bootstrap completion itself is now
+  subscription URL and filters profiles with the exact `0x8b5298` predicate
+  `profile.url == resolvedSubscribeUrl`; the fork now matches this behavior.
+- **Bootstrap/expiry:** exact warning strings/ordering, offline grace, and
+  core-stop semantics remain unverified. The lifecycle identity is resolved:
+  `AppLifecycleState@c14061` is `resumed`, matching the fork force-refresh
+  callback; timer intervals and async application disposal are also aligned. Bootstrap completion itself is now
   `bootstrap_done || hasDickServiceBound` per `0x97ad58` (auth only gates
   `_checkAccountStatus` at `0x97ad44`), and `normalizedExpiredAt` `0x6865f8`
   is `hasActivePlan && expiredAt<=0 ? -1 : expiredAt` (seconds).
