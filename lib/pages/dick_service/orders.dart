@@ -161,6 +161,13 @@ class _OrderCard extends StatelessWidget {
   final DickServiceUserOrder order;
   final VoidCallback onPay;
   final VoidCallback onCancel;
+  String get _title {
+    if (order.name.isNotEmpty) return order.name;
+    if (order.planName.isNotEmpty) return order.planName;
+    if (order.plan.isNotEmpty) return order.plan;
+    return '未命名套餐';
+  }
+
   @override
   Widget build(BuildContext context) => DickServicePanel(
     child: Column(
@@ -170,7 +177,7 @@ class _OrderCard extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                order.name.isEmpty ? order.plan : order.name,
+                _title,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),

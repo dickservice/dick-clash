@@ -37,11 +37,19 @@ class _BootstrapGateState extends ConsumerState<DickServiceBootstrapGate> {
     final profiles = ref.read(profilesProvider);
     final auth = prefs?.getString(kDickServiceAuthDataKey);
     setState(() {
-      // AOT reads dick_service_auth_data here. Normal Clash profiles do not
-      // satisfy the Dick Service bootstrap gate.
+      // AOT _load (0x97abd8) reads dick_service_auth_data and the
+      // completion closure reads bootstrap_done/profile state; the exact
+      // OR/AND table is not fully recovered, so keep the gate closed
+      // when auth is absent — stale bootstrap_done or a lingering bound
+      // profile alone must not bypass login (see audit-api-lifecycle P1).
       final bootstrapDone =
           prefs?.getBool(DickServiceExpiryCacheStore.kBootstrapDone) ?? false;
-      _complete = bootstrapDone || profiles.hasDickServiceBound;
+      final hasAuth = auth != null && auth.isNotEmpty;
+      if (!hasAuth) {
+        _complete = false;
+      } else {
+        _complete = bootstrapDone || profiles.hasDickServiceBound;
+      }
     });
     if (auth != null && auth.isNotEmpty && prefs != null) {
       unawaited(_checkAccountStatus(prefs, auth));

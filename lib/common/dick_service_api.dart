@@ -103,6 +103,7 @@ class DickServiceApi {
 
   Future<AuthSession> login(String email, String password) async {
     final endpoints = await _resolveEndpointCandidates();
+    Object? lastError;
     for (final endpoint in endpoints) {
       try {
         return await _loginWithEndpoint(endpoint, email, password);
@@ -111,11 +112,20 @@ class DickServiceApi {
         if (status == 401 || status == 422) {
           throw Exception(_invalidCredentials);
         }
+        lastError = error;
       } on Exception catch (error) {
         if (error.toString().contains(_invalidCredentials)) {
           rethrow;
         }
+        // Preserve AOT server message / missing auth errors; do not swallow
+        // into the generic endpoint-exhaustion message.
+        rethrow;
       }
+    }
+    if (lastError != null) {
+      // Keep the original network/protocol error visible while preserving
+      // the AOT exhaustion wording for the single-candidate case.
+      throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$endpoints ($lastError)');
     }
     throw Exception('没有可用的 Dick Service 登录入口，请稍后重试：$endpoints');
   }
@@ -289,7 +299,14 @@ class DickServiceApi {
     final res = await dio.post<Map<String, dynamic>>(
       endpoint.uri(epLogin).toString(),
       data: {'email': email, 'password': password},
-      options: Options(headers: {'Accept': 'application/json'}),
+      options: Options(
+        headers: {'Accept': 'application/json'},
+        // Ensure 401/422 surface as DioException so login can map them to
+        // 账号或密码错误, matching AOT 0x88ba8c-0x88bb2c; global validateStatus
+        // is <500 and would otherwise swallow them as normal responses.
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 300,
+      ),
     );
     final response = _asMap(res.data);
     final data = _unwrap(response);

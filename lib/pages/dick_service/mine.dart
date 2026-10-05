@@ -290,17 +290,24 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     final prefs = await preferences.sharedPreferencesCompleter.future;
     if (prefs == null) return;
     final token = prefs.getString(kDickServiceAuthDataKey);
+    String? resolvedSubscribeUrl;
     if (token != null && token.isNotEmpty) {
       try {
-        await _api.fetchSubscribeUrlFromAuthData(token);
+        resolvedSubscribeUrl = await _api.fetchSubscribeUrlFromAuthData(token);
       } catch (_) {}
     }
-    final profile = ref.read(profilesProvider).dickServiceBoundProfile;
+    // AOT: obtain the URL first, then reconcile profiles via the
+    // 0x8b5298 predicate + 0x8b42d0 iterator. The exact predicate is
+    // not fully recovered, so use the pure helper covering both the
+    // static marker and URL-equality candidates without guessing.
+    final candidates = ref
+        .read(profilesProvider)
+        .dickServiceLogoutCandidates(resolvedSubscribeUrl);
     await prefs.remove(kDickServiceAuthDataKey);
     await prefs.remove('dick_service_last_account_alert');
     await prefs.setBool(DickServiceExpiryCacheStore.kBootstrapDone, false);
     await DickServiceExpiryCacheStore(prefs).clear();
-    if (profile != null) {
+    for (final profile in candidates) {
       await ref.read(profilesActionProvider.notifier).deleteProfile(profile.id);
     }
     if (!mounted) return;
