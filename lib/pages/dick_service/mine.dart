@@ -34,10 +34,11 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
     _reload();
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() {
       _future = _loadSubscribe();
     });
+    await _future;
   }
 
   Future<DickServiceSubscribe> _loadSubscribe() async {
@@ -66,150 +67,154 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
           icon: const Icon(Icons.refresh),
         ),
       ],
-      body: FutureBuilder<DickServiceSubscribe>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return DickServiceStateView(
-              icon: Icons.account_circle_outlined,
-              title: '我的信息加载失败',
-              detail: '${snapshot.error}',
-              onRetry: _reload,
-            );
-          }
-          final subscribe = snapshot.data!;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text('当前套餐', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              SubscribeSummary(subscribe: subscribe),
-              Text('已用：${subscribe.formattedUsedTraffic}'),
-              Text('总量：${subscribe.formattedTotalTraffic}'),
-              const SizedBox(height: 12),
-              DickServicePanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '账号提醒',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (subscribe.shouldWarnRenewal())
-                      const Text('套餐即将到期，请及时续费。续费仅增加时长，不增加当月流量。'),
-                    if (subscribe.shouldWarnTrafficReset())
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: FutureBuilder<DickServiceSubscribe>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return DickServiceStateView(
+                icon: Icons.account_circle_outlined,
+                title: '我的信息加载失败',
+                detail: '${snapshot.error}',
+                onRetry: _reload,
+              );
+            }
+            final subscribe = snapshot.data!;
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text('当前套餐', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                SubscribeSummary(subscribe: subscribe),
+                Text('已用：${subscribe.formattedUsedTraffic}'),
+                Text('总量：${subscribe.formattedTotalTraffic}'),
+                const SizedBox(height: 12),
+                DickServicePanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '流量剩余不足 10%：剩余 ${subscribe.formattedRemainingTraffic}。重置流量仅重置当月流量，不增加时长。',
+                        '账号提醒',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                  ],
+                      const SizedBox(height: 8),
+                      if (subscribe.shouldWarnRenewal())
+                        const Text('套餐即将到期，请及时续费。续费仅增加时长，不增加当月流量。'),
+                      if (subscribe.shouldWarnTrafficReset())
+                        Text(
+                          '流量剩余不足 10%：剩余 ${subscribe.formattedRemainingTraffic}。重置流量仅重置当月流量，不增加时长。',
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              DickServicePanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DickServiceLoginPage(),
+                DickServicePanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DickServiceLoginPage(),
+                          ),
                         ),
+                        child: const Text('登录 Dick Service'),
                       ),
-                      child: const Text('登录 Dick Service'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DickServiceShopPage(),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DickServiceShopPage(),
+                          ),
                         ),
+                        child: const Text('商城'),
                       ),
-                      child: const Text('商城'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              DickServiceOrdersPage(token: widget.token),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                DickServiceOrdersPage(token: widget.token),
+                          ),
                         ),
+                        child: const Text('我的订单'),
                       ),
-                      child: const Text('我的订单'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              DickServiceTicketsPage(token: widget.token),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                DickServiceTicketsPage(token: widget.token),
+                          ),
                         ),
+                        child: const Text('工单'),
                       ),
-                      child: const Text('工单'),
-                    ),
-                    Text(
-                      '账户操作',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DickServiceGiftCardPage(),
+                      Text(
+                        '账户操作',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DickServiceGiftCardPage(),
+                          ),
                         ),
+                        icon: const Icon(Icons.card_giftcard),
+                        label: const Text('兑换码兑换'),
                       ),
-                      icon: const Icon(Icons.card_giftcard),
-                      label: const Text('兑换码兑换'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _resetTraffic(subscribe),
-                      icon: const Icon(Icons.restart_alt),
-                      label: const Text('重置流量'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _resetSubscribe,
-                      icon: const Icon(Icons.security_update_good),
-                      label: const Text('重置订阅链接'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DickServiceShopPage(),
+                      OutlinedButton.icon(
+                        onPressed: () => _resetTraffic(subscribe),
+                        icon: const Icon(Icons.restart_alt),
+                        label: const Text('重置流量'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _resetSubscribe,
+                        icon: const Icon(Icons.security_update_good),
+                        label: const Text('重置订阅链接'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DickServiceShopPage(),
+                          ),
                         ),
+                        icon: const Icon(Icons.shopping_bag),
+                        label: const Text('商城'),
                       ),
-                      icon: const Icon(Icons.shopping_bag),
-                      label: const Text('商城'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              DickServiceOrdersPage(token: widget.token),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                DickServiceOrdersPage(token: widget.token),
+                          ),
                         ),
+                        icon: const Icon(Icons.receipt_long),
+                        label: const Text('我的订单'),
                       ),
-                      icon: const Icon(Icons.receipt_long),
-                      label: const Text('我的订单'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              DickServiceTicketsPage(token: widget.token),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                DickServiceTicketsPage(token: widget.token),
+                          ),
                         ),
+                        icon: const Icon(Icons.support_agent),
+                        label: const Text('工单'),
                       ),
-                      icon: const Icon(Icons.support_agent),
-                      label: const Text('工单'),
-                    ),
-                    TextButton.icon(
-                      onPressed: _logout,
-                      icon: const Icon(Icons.logout),
-                      label: const Text('退出登录'),
-                    ),
-                  ],
+                      TextButton.icon(
+                        onPressed: _logout,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('退出登录'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -237,7 +242,7 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
           checkout: checkout,
           tradeNo: order.tradeNo,
         );
-        _reload();
+        await _reload();
       }
     } catch (error) {
       _showMessage(compactError(error));
@@ -269,7 +274,7 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
           .read(profilesActionProvider.notifier)
           .addDickServiceBoundProfile();
       _showMessage('订阅已重置，软件内配置已自动刷新');
-      _reload();
+      await _reload();
     } catch (error) {
       _showMessage(compactError(error));
     }
