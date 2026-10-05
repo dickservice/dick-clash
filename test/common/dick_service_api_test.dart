@@ -10,8 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 class _Adapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   final Map<String, Object?> responses;
+  final Map<String, int> statusCodes;
 
-  _Adapter({this.responses = const {}});
+  _Adapter({this.responses = const {}, this.statusCodes = const {}});
 
   @override
   Future<ResponseBody> fetch(
@@ -26,16 +27,21 @@ class _Adapter implements HttpClientAdapter {
         (options.uri.path == DickServiceApi.epGetSubscribe
             ? {
                 'plan_id': 3,
-                'reset_price': 600,
+                'plan': {
+                  'name': 'Example',
+                  'prices': {'reset_price': 600},
+                },
                 'subscribe_url': 'https://example.com/sub',
               }
             : {
                 'plan': {'name': 'Example'},
                 'expired_at': 2000000000,
               });
+    final statusCode =
+        statusCodes[options.path] ?? statusCodes[options.uri.path] ?? 200;
     return ResponseBody.fromString(
       jsonEncode({'data': data}),
-      200,
+      statusCode,
       headers: {
         'content-type': ['application/json'],
       },
@@ -139,13 +145,47 @@ void main() {
     dio.close();
   });
 
+  test(
+    'typed list methods reject non-map elements like AOT conversion',
+    () async {
+      final adapter = _Adapter(
+        responses: {
+          DickServiceApi.epPlanFetch: ['invalid'],
+          DickServiceApi.epOrderFetch: {
+            'orders': ['invalid'],
+          },
+          DickServiceApi.epTicketFetch: {
+            'tickets': ['invalid'],
+          },
+        },
+      );
+      final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
+        ..httpClientAdapter = adapter;
+      final api = DickServiceApi(dio: dio);
+
+      await expectLater(api.fetchPlans(), throwsA(isA<TypeError>()));
+      await expectLater(api.fetchOrders('auth'), throwsA(isA<TypeError>()));
+      await expectLater(api.fetchTickets('auth'), throwsA(isA<TypeError>()));
+      dio.close();
+    },
+  );
+
   test('subscribe derived values follow AOT semantics', () {
     final subscribe = DickServiceSubscribe.fromJson({
       'plan_id': 1,
       'transfer_enable': 0,
       'prices': {'reset_traffic': 4096},
     });
-    expect(subscribe.resetTraffic, 4096);
+    expect(subscribe.resetTraffic, isNull);
+    expect(subscribe.resetPrice, isNull);
+    final selectedPlan = DickServiceSubscribe.fromJson({
+      'plan_id': 1,
+      'plan': {
+        'prices': {'reset_traffic': 4096, 'reset_price': 600},
+      },
+    });
+    expect(selectedPlan.resetTraffic, 4096);
+    expect(selectedPlan.resetPrice, 600);
     expect(subscribe.remainingTrafficRatio(), 1.0);
     expect(subscribe.shouldWarnTrafficReset(), isFalse);
     expect(subscribe.remainingTimeText(), '长期有效');
@@ -224,6 +264,18 @@ void main() {
       dio.close();
     },
   );
+
+  test('login maps only HTTP 401 and 422 to invalid credentials', () async {
+    final adapter = _Adapter(statusCodes: {DickServiceApi.epLogin: 422});
+    final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
+      ..httpClientAdapter = adapter;
+    final api = DickServiceApi(dio: dio);
+    await expectLater(
+      api.login('mail@example.com', 'secret'),
+      throwsA(predicate((error) => error.toString().contains('账号或密码错误'))),
+    );
+    dio.close();
+  });
 
   test('write methods use the AOT-observed bodies', () async {
     final adapter = _Adapter(

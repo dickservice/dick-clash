@@ -58,11 +58,9 @@ class DickServiceApi {
       options: Options(headers: {'Accept': 'application/json'}),
     );
     final response = _asMap(res.data);
-    _throwIfFailed(response);
     final data = response['data'];
     if (data is! List) throw Exception('套餐列表返回格式异常');
     return data
-        .whereType<Map>()
         .map((e) => DickServicePlan.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
@@ -110,7 +108,7 @@ class DickServiceApi {
         return await _loginWithEndpoint(endpoint, email, password);
       } on DioException catch (error) {
         final status = error.response?.statusCode;
-        if (status == 401 || status == 403) {
+        if (status == 401 || status == 422) {
           throw Exception(_invalidCredentials);
         }
       } on Exception catch (error) {
@@ -135,7 +133,6 @@ class DickServiceApi {
     final raw = data is Map ? data['orders'] : data;
     if (raw is! List) throw Exception('订单列表返回格式异常');
     return raw
-        .whereType<Map>()
         .map((e) => DickServiceUserOrder.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
@@ -153,7 +150,6 @@ class DickServiceApi {
     final raw = data is Map ? data['tickets'] : data;
     if (raw is! List) throw Exception('工单列表返回格式异常');
     return raw
-        .whereType<Map>()
         .map((e) => DickServiceTicket.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
@@ -296,10 +292,6 @@ class DickServiceApi {
       options: Options(headers: {'Accept': 'application/json'}),
     );
     final response = _asMap(res.data);
-    final status = response['status']?.toString().toLowerCase();
-    if (status == 'fail' || status == 'error') {
-      throw Exception(_invalidCredentials);
-    }
     final data = _unwrap(response);
     final token = _findAuthData(data);
     if (token == null || token.isEmpty) {

@@ -143,16 +143,11 @@ class DickServiceSubscribe {
     final u = _firstNullableInt(a, b, 'u') ?? 0;
     final d = _firstNullableInt(a, b, 'd') ?? 0;
     final resetDay = _firstNullableInt(a, b, 'reset_day');
-    final prices =
-        _firstMap(a, b, 'prices') ??
-        _firstMap(planMap ?? const <String, dynamic>{}, null, 'prices');
+    final prices = planMap == null ? null : _firstMap(planMap, null, 'prices');
     final resetPrice =
-        _firstNullableInt(a, b, 'reset_price') ??
         _nullableInt(prices?['reset_price']) ??
         _nullableInt(planMap?['reset_price']);
-    final resetTraffic =
-        _nullableInt(prices?['reset_traffic']) ??
-        _nullableInt(planMap?['reset_traffic']);
+    final resetTraffic = _nullableInt(prices?['reset_traffic']);
 
     String planName = '暂无套餐';
     if (planMap != null) {

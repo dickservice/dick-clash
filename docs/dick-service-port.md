@@ -1,74 +1,222 @@
 # Dick Service port status
 
-## Integrated audit checkpoint
+## Scope and evidence boundary
 
-The integrated API/cache/script/database suite passes 61 tests. Native asset
-hooks were temporarily disabled for Dart tests and restored afterward; this is
-not an Android release-build or device verification. Analysis reports only the
-pre-existing const-constructor info in scrollbar_inset_test.dart.
+This fork ports Dick Service v1.0.15 differences that are supported by the
+available APK resources, reconstructed Dick AOT, reachable AOT call sites, and
+source comparison. It is not a claim of byte-for-byte or exhaustive behavioral
+parity. The original FlClash AOT was not reconstructed, and the Dick APK was
+not executed on a device in this workspace.
 
-- API: typed plan/order/ticket lists, period-keyed prices, UUID-v4 signing
-  nonce, dedicated reset-price order, response/error and formatting contracts.
-- Account pages: inline first-purchase login, cancellation confirmation,
-  authenticated list guidance, payment trade number and explicit close action.
-- State: bootstrap profile detection, persisted account-alert deduplication,
-  30-minute refresh, timestamped-cache integrity and clock rollback locks.
-- Rules: built-in script identity -10086, asset loading, non-persisted list
-  injection and script-mode fallback (not a global overwrite-mode change).
-- Android resources: launcher/round icons, adaptive foreground and TV banner
-  copied from the Dick APK. Implementation namespace is unchanged.
-- Shared UI: updater repository, Telegram link and Dick account navigation
-  are represented; no proven default VPN/startup-page change is claimed.
+Static evidence does not establish pagination, token refresh, payment
+callback/polling, offline grace, exact core behavior, Firebase telemetry
+behavior, or the complete profile predicate used during logout. Those items
+remain explicitly unimplemented or marked unknown rather than guessed.
 
-Remaining evidence limits: original AOT was not reconstructed; core binaries
-have different Go/VCS metadata but their behavioral delta is unresolved.
-Firebase resource omission does not establish telemetry disablement. About
-core-link source/payload provenance, endpoint recovery, URL-matched logout
-cleanup and exact runtime warning behavior need further verification. APK
-signing identity, a rebuilt APK and real-device/payment flows are not verified.
-Consequently this checkpoint is not a claim of exhaustive binary parity.
+## Integrated audit checkpoint (c25c2cb)
 
-This fork reproduces the Dick-specific changes that can be verified from the
-`dick-service v1.0.15` APK without executing it:
+The previous integrated checkpoint was committed and pushed as `c25c2cb`:
 
-- Android application ID: `org.dickservice.client`
-- Android label and service branding: `Dick Service`
-- `dickservice://` is accepted alongside the upstream configuration schemes.
-- Firebase package entries match the release, debug, and development Android
-  application IDs.
-- `assets/data/dick_rule.js` is bundled byte-for-byte from the APK. Its SHA-256
-  is `d2b761ac9b854c16fe4df2108e1c34c3fd889d7a55c867a306227de8aa0df55c`.
-- The Android implementation namespace remains `com.follow.clash.*`, matching
-  the APK. Changing Java/Kotlin namespaces would break the recovered identity.
+- `HEAD == origin/main == c25c2cb` at that checkpoint.
+- The integrated API/cache/script/database suite passed 61 tests.
+- Native asset hooks (`hooks.user_defines.setup.build_assets` and
+  `hooks.user_defines.rust_api.build_assets`) were temporarily disabled for
+  Dart tests and restored to `true` afterward; this is not an Android
+  release-build or device verification.
+- `flutter analyze --no-pub` reported only the pre-existing
+  const-constructor info in `test/widgets/scrollbar_inset_test.dart`.
+- `assets/data/dick_rule.js` remained byte-for-byte unchanged at 55,840 bytes
+  with SHA-256
+  `d2b761ac9b854c16fe4df2108e1c34c3fd889d7a55c867a306227de8aa0df55c`.
 
-## Dick Service feature evidence
+After that checkpoint, a residual AOT audit identified a small API/model/test
+correction set (login error mapping, plan fetch, strict list conversion,
+subscribe reset provenance). Those edits are included below and verified by
+the updated test suite before this checkpoint is treated as verified.
 
-The APK also contains dedicated login, account, plan/shop, order, ticket,
-gift-card, subscription-cache, and expiry-gate code. Those modules were
-compiled into Flutter's stripped AOT snapshot; this repository does not contain
-their source. Their endpoint names and state-key strings are documented in the
-comparison reports under `work/flclash-diff/reports/`.
+## Implemented from AOT
 
-The static AOT now provides the login, order, checkout, order cancellation,
-ticket creation, gift-card redemption, reset-security, and payment WebView
-contracts. Pagination, token refresh, payment callback/polling behavior, and
-the expiry gate's exact offline grace policy remain unavailable.
+### API and models (`lib/common/dick_service_api.dart`, `lib/common/dick_service_models.dart`)
 
-## Implemented from AOT (static-only, no guessing)
+- Base URL: `https://airport.dicksupport.top`.
+- Recovered AuroraDeck user agent (`AuroraDeck/7.4.2 (Android; ndk-aurora-74; rv:20260630)`),
+  client ID (`ndk-aurora-74`), signing key (`c9f1f637772c44f72f6914d02db94f5e4e0d3d9a833af0d6c70ba0a6e56bb7a4`),
+  header names `X-Client-Id/Ts/Nonce/Sign/Sign-Version`, and HMAC input order
+  `method\npath?query\nts\nnonce\nsha256(canonicalBody)` from
+  `aot-dick-full/asm/fl_clash/common/dick_service_api.dart`.
+- UUID-v4 signing nonce and canonical body hashing.
+- Login body `{email, password}` and `auth_data`/`accessToken` extraction.
+- Endpoints as literals: `POST /api/v1/passport/auth/login`,
+  `GET /api/v1/user/getSubscribe`, `GET /api/v1/user/info`,
+  `GET /api/v1/guest/plan/fetch`, `GET /api/v1/user/order/fetch`,
+  `POST /api/v1/user/order/save`, `POST /api/v1/user/order/checkout`,
+  `POST /api/v1/user/order/cancel`, `GET /api/v1/user/ticket/fetch`,
+  `POST /api/v1/user/ticket/save`, `POST /api/v1/user/gift-card/redeem`,
+  `GET /api/v1/user/resetSecurity`.
+- Outer `login` maps only HTTP 401 and 422 Dio responses to `账号或密码错误`
+  (AOT `0x88ba8c` class `0xb52`, tagged `0x322`/`0x34c`). Server-level
+  `fail`/`error` responses continue through `_throwIfFailed` (`0x67ac6c`) and
+  preserve their server message.
+- `fetchPlans` does not call `_throwIfFailed` before reading `data`; a
+  `{status: fail}` response reaches `套餐列表返回格式异常` as in AOT `0x8b631c`.
+- Plan, order, and ticket list mapping uses strict
+  `Map<String, dynamic>.from` conversion. Non-map list elements are not
+  silently filtered (AOT `LinkedHashMap.from` at `0x8b668c`, `0x90db00`,
+  `0x920608`).
+- Plan prices are period-keyed positive numeric values and preserve string
+  price IDs (`DickServicePlan.fromJson` `0x8b66b0`).
+- Order fetch supports `data.orders` and direct-list shapes
+  (`0x90d8d4..0x90d9dc`); ticket fetch supports `data.tickets` and direct-list
+  (`0x92048c..0x92058c`).
+- Traffic reset retains the dedicated `createTrafficResetOrder` boundary
+  (`0x8b3c60`) delegating to `createOrder` with period `reset_price`.
+- Observed write bodies for order create/checkout/cancel, gift-card redeem,
+  ticket create, and reset-security are implemented.
+- Checkout response parsing supports URL and HTML branches without issuing an
+  unverified payment request, preserving `支付链接返回为空`.
+- `DickServiceSubscribe.resetTraffic` and `resetPrice` are derived from the
+  selected `plan.prices` map only (`0x6867a4..0x686e64`). A payload with no
+  `plan` map does not gain reset values from a root-level `prices` map.
+- `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
+  closure `0x67b754` is preserved; it gates the outer login 401/422 check.
+- Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
+  non-map rejection (`TypeError`), subscribe semantics, gift summary,
+  checkout errors, login bodies/validation, and write bodies.
 
-- `lib/common/dick_service_api.dart` — baseUrl `https://airport.dicksupport.top`, UA `AuroraDeck/7.4.2 (Android; ndk-aurora-74; rv:20260630)`, HMAC key `c9f1f637…56bb7a4`, header names `X-Client-Id/Ts/Nonce/Sign/Sign-Version`, `GET /api/v1/guest/plan/fetch`, `GET /api/v1/user/{getSubscribe,info,order/fetch,ticket/fetch}`, `POST /api/v1/user/order/{save,checkout}`, response helpers `_asMap/_throwIfFailed/_unwrap/_extractUrl/_looksLikeHtml/_findUrl/_findHtml` and signing `method\npath?query\nts\nnonce\nsha256(canonicalBody)` verified from `aot-dick-full/asm/fl_clash/common/dick_service_api.dart`.
-- `lib/common/dick_service_expiry_cache.dart` — keys `dick_service_cached_expired_at/_has_active_plan/_plan_name/_last_subscribe_sync_at/_last_local_check_at/_bootstrap_done/_expired_lock` and save/clear semantics from `dick_service_expiry_cache.dart`.
-- `lib/common/dick_service_models.dart` — tolerant static-AOT models for subscriptions, plans, orders, tickets, checkout responses, and gift-card results.
-- `lib/common/dick_service_profile.dart` — exact bound-subscription URL detection and `dick_service_auth_data` key.
-- `lib/pages/dick_service/` — account login and persistence, bound-profile import, shop/order checkout, payment WebView, order cancellation, gift-card redemption, ticket creation, subscription reset, traffic-reset purchase, and logout.
-- `lib/pages/dick_service/gates.dart` — bootstrap and expiry gates, lifecycle-resume recheck, cache/signature handling, and the observed expiry messages. Offline grace and account-alert policy remain unverified.
-- `lib/common/dick_service_api.dart` — typed subscription fetch joins `getSubscribe` and `info`; AOT-observed POST bodies are implemented for login, order save/checkout/cancel, gift-card redemption, and ticket creation.
+### Account and state
 
-The focused static tests cover GET signing/subscription joins, login verification,
-all observed write bodies, and expiry-cache integrity. Flutter analysis passes with
-one pre-existing info in `test/widgets/scrollbar_inset_test.dart`.
+- Bound Dick profile marker:
+  `https://dicksupport.top/__dick_service_user_bound_subscribe__`
+  (`0x67bb6c`) and resolution via `fetchSubscribeUrlFromAuthData` (`0x67a64c`).
+- Account pages: login, plans/shop, orders, tickets, gift-card redemption,
+  payment WebView, cancellation, subscription reset, traffic reset, and logout.
+- Bootstrap account-status refresh, persisted alert deduplication via
+  `dick_service_last_account_alert`, and the observed 30-minute refresh timer
+  (`0x6b49d200`/`0x973a88`) are represented.
+- Expiry cache keys, millisecond local timestamps, 60-second rollback lock
+  (`60000` ms), signature validation, missing/tampered-cache handling, and
+  bootstrap auth dependency are represented.
+- Traffic warning threshold is `< 0.1` (`0x88cbe4`/`0x88cc68`). The exact
+  renewal window (`0x88cd38`), offline grace, and core-stop behavior remain
+  unknown.
+- Logout clears auth, alert, bootstrap, and expiry state. AOT also resolves
+  the subscription URL and iterates profiles via predicate `0x8b5298`/`0x67bb44`;
+  the fork currently keeps the strict static-bound cleanup until that predicate
+  is captured.
 
-## Verification baseline
+### Built-in script and navigation
 
-The APK comparison used static analysis only. The rule asset hash above is
-checked against the extracted APK resource. Verified with Flutter 3.47.1 / Dart 3.13.1 (`/opt/flutter`, `flutter pub get` + `flutter analyze` pass with 1 pre-existing info).
+- `Script.builtInDickService()` uses ID `-10086`, label `Dick Service`,
+  `DateTime(2026)`, and `assets/data/dick_rule.js`.
+- Injected transiently by `Scripts.build()`; not persisted in the database.
+- Null and `-10086` script-mode values use the recovered default.
+- Dick account entries (Mine, Shop, Orders, Tickets) precede the original
+  shared navigation entries (`0xc56b24..0xc57208`); shared order and
+  conditional Proxies/Logs behavior remain unchanged.
+
+### Android and branding
+
+- Android application ID: `org.dickservice.client` (debug `.dev` preserved).
+- Android label and service branding: `Dick Service`.
+- `dickservice://` accepted alongside upstream configuration schemes.
+- Firebase package entries match the release/debug/development application IDs
+  (see native section for behavioral caveat).
+- `assets/data/dick_rule.js` bundled byte-for-byte (hash above).
+- Android implementation namespace remains `com.follow.clash.*`, matching
+  the APK. Launcher/round icons, adaptive foreground, and TV banner are
+  byte-for-byte from the Dick APK.
+
+### Shared UI and startup
+
+- Telegram link is `https://t.me/dickvpngroup` (AOT `0xab7ac8`).
+- Project and reachable updater endpoint use `dickservice/dick-clash`
+  (`Request::checkForUpdate` `0x9792bc`, `_checkGitHubReleaseUpdate`
+  `0x979334`, endpoint `dick.libapp.strings:34393`).
+- Dick startup wraps HomePage in the account/bootstrap gate
+  (`Instance_DickServiceBootstrapGate`).
+- VPN property defaults remain `enable=true`, `systemProxy=true`, unchanged.
+- Effective external-controller config default remains closed; open enum
+  address is `127.0.0.1:9090` (`0x67b090` mapping).
+
+## Known provenance conflicts and residual gaps
+
+- **About core link:** Dick AOT About closure at `0xab7774` opens
+  `https://github.com/chen08209/Clash.Meta/tree/FlClash` (`0xab7a70`), while
+  this fork opens `https://github.com/dickservice/dick-clash`. Telegram and
+  project/updater are independently confirmed and ported. The core-link
+  mismatch is recorded as APK/source provenance conflict and is not silently
+  rewritten without establishing the authoritative build revision.
+- **Logout URL reconciliation:** AOT Mine `_logout` (`0x8b40cc`) fetches the
+  subscription URL and iterates profiles; the fork keeps strict static-bound
+  matching until the predicate `0x8b5298` is captured from runtime/AOT detail.
+- **Bootstrap/expiry:** exact warning strings/ordering, timer interval
+  literal, offline grace, and core-stop operation (`handleExit` candidate)
+  remain unverified.
+- **Pagination/token refresh/payment callbacks/polling** remain unimplemented.
+
+## Native residual audit (read-only)
+
+Source: `reports/audit-native-residual.md` (no fork source edits).
+
+- **Signing identity is a real difference.** Both APKs use APK Signature
+  Scheme v2 with no JAR `META-INF`. FlClash signer DN `O=com.follow.clash`,
+  cert SHA-256 `2859e236b6c1c6073773752678c52e8e902a9503ae9beed6729ca999c376841c`,
+  pub-key SHA-256 `a258cd929c3074be1f99ac55c473383a55d24eee833b4c5d520e040e86dc2069`.
+  Dick 1.0.15 signer DN `CN=Dick Service, OU=Dick Service, O=Dick Service`,
+  cert SHA-256 `8b65aee39fd8bd5b0f6f11a7b4d71414d28e3948be94c7043f5702b0511304ea`,
+  pub-key SHA-256 `d9ee415e63592ca7ed70d383048ef853bc8b2beb847e0333fd2ba518a5659905`.
+  No `android/app/keystore.jks` is present in the checkout; no private key is
+  inferred. Record `apksigner verify --print-certs` digests for any release.
+- **Firebase resource removal is packaging-level, not proven disablement.**
+  FlClash `res/values/strings.xml` contains `gcm_defaultSenderId`,
+  `google_app_id`, `google_api_key`, etc.; Dick contains none of those values
+  but retains the same Firebase component declarations, native libraries,
+  `firebase-analytics.properties`, and keep files. Checked-in
+  `google-services.json` is placeholder. Do not claim no-telemetry from
+  resource deletion alone; remove dependencies or supply a valid Dick config
+  and test merged manifest/runtime if that behavior is intended.
+- **No additional Dick-only native service/permission.** Both APKs have 20
+  uses-permissions, 2 signature permissions, 3 optional features, 4 activities,
+  12 services, 4 receivers, 5 providers. Differences are package-derived
+  authorities/actions, labels, and the `dickservice` scheme.
+- **Core revision differs.** FlClash `libclash.so` is Go `go1.24.0`, VCS
+  `45015f856b44cb52cca755c04c885d73c45ae6b9` (2026-05-29), modified. Dick is Go
+  `go1.24.4`, module `core v0.8.94-0.20260705130944-5b6138390317+dirty`, VCS
+  `5b6138390317a12ac977829eff9d00a21affb8ea` (2026-07-05), modified. The Dick
+  revision/dirty diff is not present locally; Go/toolchain versions in fork
+  workflows differ (fork Flutter 3.47.1 / Go 1.26.4 vs source 3.41.9 / 1.24.0).
+  Exact reproduction is blocked by missing provenance, keystore, dirty diff,
+  and toolchains.
+- **Exact APK reproduction is not currently supported.** Both APK ZIPs have
+  1981 timestamps, AGP `8.12.2`, v2-signed; entry counts differ (689 vs 687)
+  due to `dick_rule.js`. No reproducible-build lock/container was found.
+
+Do not make another native/source patch from these APK differences without
+establishing release provenance (authorized key, Dick core source+diff,
+build manifests/toolchains) and an explicit Firebase decision.
+
+## Verification protocol
+
+Before accepting the residual API patch as the new verified checkpoint:
+
+1. Temporarily set both `hooks.user_defines.setup.build_assets` and
+   `hooks.user_defines.rust_api.build_assets` to `false` in `pubspec.yaml`.
+2. Run `dart format`, focused Dick Service tests, broader `flutter test` if
+   available, and `flutter analyze --no-pub` via `/opt/flutter`.
+3. Restore both hook values to `true` and verify the diff contains no hook
+   changes (`git diff --check` clean except intended files).
+4. Recheck `dick_rule.js` size and SHA-256.
+5. Review `git diff --stat`, commit, push `main`, and verify a clean worktree
+   with `HEAD == origin/main`.
+
+Evidence is retained in:
+
+- `work/flclash-diff/reports/audit-api-full.md`
+- `work/flclash-diff/reports/audit-api-residual.md`
+- `work/flclash-diff/reports/audit-apk-wide.md`
+- `work/flclash-diff/reports/audit-lifecycle-residual.md`
+- `work/flclash-diff/reports/audit-native-residual.md`
+- `work/flclash-diff/reports/audit-pages-full.md`
+- `work/flclash-diff/reports/audit-shared-aot.md`
+- `work/flclash-diff/reports/audit-shared-residual.md`
+- `work/flclash-diff/reports/audit-state-full.md`
