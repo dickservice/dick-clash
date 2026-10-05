@@ -204,6 +204,32 @@ void main() {
     final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     expect(
       DickServiceSubscribe(
+        planName: 'Expires now',
+        hasActivePlan: true,
+        expiredAt: nowSeconds,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 1,
+      ).isTimeBasedExpired(),
+      isTrue,
+      reason: 'AOT 0x685fa0 negates expireTime.isAfter(now)',
+    );
+    expect(
+      const DickServiceSubscribe(
+        planName: 'Negative expiry',
+        hasActivePlan: false,
+        expiredAt: -1,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 0,
+      ).expireTime().millisecondsSinceEpoch,
+      0,
+      reason: 'AOT 0x685ff8 clamps negative expiry seconds to the epoch',
+    );
+    expect(
+      DickServiceSubscribe(
         planName: 'Renewal threshold',
         hasActivePlan: true,
         expiredAt: nowSeconds + 3 * 24 * 3600 + 12 * 3600,

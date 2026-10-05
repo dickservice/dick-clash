@@ -177,16 +177,14 @@ class DickServiceSubscribe {
     return expiredAt;
   }
 
-  DateTime? expireTime() {
-    if (expiredAt <= 0) return null;
-    return DateTime.fromMillisecondsSinceEpoch(expiredAt * 1000, isUtc: false);
+  DateTime expireTime() {
+    final seconds = expiredAt < 0 ? 0 : expiredAt;
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: false);
   }
 
   bool isTimeBasedExpired() {
     if (expiredAt <= 0) return false;
-    final et = expireTime();
-    if (et == null) return false;
-    return DateTime.now().isAfter(et);
+    return !expireTime().isAfter(DateTime.now());
   }
 
   bool isExpired() {
@@ -212,7 +210,7 @@ class DickServiceSubscribe {
 
   bool shouldWarnRenewal() {
     if (expiredAt <= 0) return false;
-    final remaining = expireTime()!.difference(DateTime.now());
+    final remaining = expireTime().difference(DateTime.now());
     if (remaining.isNegative) return false;
     return remaining.inDays <= 3;
   }
@@ -220,8 +218,7 @@ class DickServiceSubscribe {
   String remainingTimeText() {
     if (!hasActivePlan) return '未开通/已过期';
     if (expiredAt <= 0) return '长期有效';
-    final et = expireTime();
-    final days = et!.difference(DateTime.now()).inDays;
+    final days = expireTime().difference(DateTime.now()).inDays;
     if (days < 0) return '已过期';
     if (days == 0) return '今天到期';
     return '剩余 $days 天';
