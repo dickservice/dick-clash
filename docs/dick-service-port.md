@@ -181,7 +181,10 @@ This document now records the current workdir
   reloads the cache and is otherwise swallowed; and a refreshed subscription
   uses full `isExpired` semantics, including no active plan. A valid,
   non-expired cache clears any stale overlay before `shouldRefresh` can return
-  early (`0x685c60..0x685cc8`).
+  early (`0x685c60..0x685cc8`). The APK's counterintuitive expired-cache split
+  is retained: a normal check proceeds to fetch immediately, while a forced
+  check first applies the non-forced `shouldRefresh()` result
+  (`0x685c1c..0x685c5c`).
 - Expiry-gate startup registers the initial check as a post-frame callback
   before creating the periodic timer (`0x973b50..0x973c60`). The timer duration
   object `Duration@c14d31` is `1,800,000,000µs` (30 minutes). Disposal removes
