@@ -121,7 +121,9 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
                       ),
                       const SizedBox(height: 8),
                       if (subscribe.shouldWarnRenewal())
-                        const Text('套餐即将到期，请及时续费。续费仅增加时长，不增加当月流量。'),
+                        Text(
+                          '套餐即将到期：${subscribe.remainingTimeText()}，请及时续费。续费仅增加时长，不增加当月流量。',
+                        ),
                       if (subscribe.shouldWarnTrafficReset())
                         Text(
                           '流量剩余不足 10%：剩余 ${subscribe.formattedRemainingTraffic}。重置流量仅重置当月流量，不增加时长。',
