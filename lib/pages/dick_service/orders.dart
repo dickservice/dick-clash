@@ -67,6 +67,7 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
               title: '订单加载失败',
               detail: '${snapshot.error}',
               onRetry: _reload,
+              retryLabel: '重试',
             );
           }
           if (snapshot.data!.isEmpty) {

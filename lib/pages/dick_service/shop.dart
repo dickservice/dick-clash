@@ -60,6 +60,7 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
               title: '套餐加载失败',
               detail: '${snapshot.error}',
               onRetry: _reload,
+              retryLabel: '重试',
             );
           }
           final plans = snapshot.data!;

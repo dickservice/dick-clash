@@ -71,6 +71,7 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
               title: '工单加载失败',
               detail: '${snapshot.error}',
               onRetry: _reload,
+              retryLabel: '重试',
             );
           }
           if (snapshot.data!.isEmpty) {
