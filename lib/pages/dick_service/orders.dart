@@ -186,9 +186,7 @@ class _OrderCard extends StatelessWidget {
   final VoidCallback? onPay;
   final VoidCallback? onCancel;
   String get _title {
-    if (order.name.isNotEmpty) return order.name;
     if (order.planName.isNotEmpty) return order.planName;
-    if (order.plan.isNotEmpty) return order.plan;
     return '未命名套餐';
   }
 

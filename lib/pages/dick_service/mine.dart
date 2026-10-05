@@ -133,7 +133,7 @@ class _DickServiceMinePageState extends ConsumerState<DickServiceMinePage> {
   }
 
   Future<void> _resetTraffic(DickServiceSubscribe subscribe) async {
-    final price = subscribe.resetPrice ?? 0;
+    final price = subscribe.resetPrice;
     if (subscribe.planId <= 0 || price <= 0) {
       _showMessage('当前套餐没有可用的重置流量价格，请到官网处理');
       return;

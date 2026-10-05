@@ -27,10 +27,7 @@ class _Adapter implements HttpClientAdapter {
         (options.uri.path == DickServiceApi.epGetSubscribe
             ? {
                 'plan_id': 3,
-                'plan': {
-                  'name': 'Example',
-                  'prices': {'reset_price': 600},
-                },
+                'plan': {'name': 'Example', 'reset_price': 600},
                 'subscribe_url': 'https://example.com/sub',
               }
             : {
@@ -95,14 +92,14 @@ void main() {
     final plan = DickServicePlan.fromJson({
       'id': 7,
       'name': 'Example',
-      'prices': {
-        'month_price': 100,
-        'quarter_price': '250',
-        'invalid': 0,
-        'negative': -1,
-      },
+      'month_price': 100,
+      'quarter_price': '250',
+      'half_year_price': 0,
+      'year_price': -1,
+      'two_year_price': '1.5',
     });
-    expect(plan.priceOptions.map((option) => option.id), [
+    expect(plan.priceOptions.map((option) => option.id), ['月付', '季付']);
+    expect(plan.priceOptions.map((option) => option.period), [
       'month_price',
       'quarter_price',
     ]);
@@ -115,11 +112,7 @@ void main() {
     final adapter = _Adapter(
       responses: {
         DickServiceApi.epPlanFetch: [
-          {
-            'id': 1,
-            'name': 'Plan',
-            'prices': {'month': 100},
-          },
+          {'id': 1, 'name': 'Plan', 'month_price': 100},
         ],
         DickServiceApi.epOrderFetch: {
           'orders': [
@@ -138,7 +131,8 @@ void main() {
     final plans = await api.fetchPlans();
     final orders = await api.fetchOrders('auth');
     final tickets = await api.fetchTickets('auth');
-    expect(plans.single.priceOptions.single.id, 'month');
+    expect(plans.single.priceOptions.single.id, '月付');
+    expect(plans.single.priceOptions.single.period, 'month_price');
     expect(orders.single.planName, 'Plan');
     expect(orders.single.statusText, '已关闭');
     expect(tickets.single.subject, 'Help');
@@ -176,16 +170,34 @@ void main() {
       'transfer_enable': 0,
       'prices': {'reset_traffic': 4096},
     });
-    expect(subscribe.resetTraffic, isNull);
-    expect(subscribe.resetPrice, isNull);
+    expect(subscribe.resetPrice, 0);
     final selectedPlan = DickServiceSubscribe.fromJson({
       'plan_id': 1,
       'plan': {
         'prices': {'reset_traffic': 4096, 'reset_price': 600},
+        'reset_price': 700,
       },
     });
-    expect(selectedPlan.resetTraffic, 4096);
-    expect(selectedPlan.resetPrice, 600);
+    expect(
+      selectedPlan.resetPrice,
+      4096,
+      reason:
+          'AOT 0x686e28 prefers plan.prices.reset_traffic even though Mine '
+          'uses the resulting field as the reset order price',
+    );
+    expect(
+      DickServiceSubscribe.fromJson({
+        'plan_id': 1,
+        'plan': {
+          'prices': {'reset_price': 600},
+          'reset_price': 700,
+        },
+      }).resetPrice,
+      700,
+      reason:
+          'AOT 0x686e54 falls back to plan.reset_price, not '
+          'plan.prices.reset_price',
+    );
     expect(subscribe.remainingTrafficRatio(), 1.0);
     expect(subscribe.shouldWarnTrafficReset(), isFalse);
     expect(
@@ -315,10 +327,60 @@ void main() {
   test('gift summary includes invite rewards using AOT delimiters', () {
     final result = DickServiceGiftCardRedeemResult.fromJson({
       'message': '兑换成功',
-      'rewards': ['套餐'],
-      'invite_rewards': ['余额'],
+      'template_name': '会员礼品卡',
+      'rewards': {'套餐': '月付', '空值': ''},
+      'invite_rewards': {'余额': 100},
     });
-    expect(result.summary, '套餐；邀请奖励：余额');
+    expect(result.summary, '兑换成功：会员礼品卡；套餐: 月付；邀请奖励：余额: 100');
+  });
+
+  test('plan parsing preserves APK root price keys and visibility', () {
+    final plan = DickServicePlan.fromJson({
+      'id': 7,
+      'name': ' Plan ',
+      'content': '* line one *\n\n line two ',
+      'transfer_enable': '4096',
+      'show': false,
+      'month_price': '100',
+      'quarter_price': 0,
+      'prices': {'month_price': 999},
+    });
+    expect(plan.name, ' Plan ');
+    expect(plan.transferEnable, 4096);
+    expect(plan.show, isFalse);
+    expect(plan.contentPreview, 'line one\nline two');
+    expect(plan.priceOptions.single.id, '月付');
+    expect(plan.priceOptions.single.period, 'month_price');
+    expect(plan.priceOptions.single.price, 100);
+  });
+
+  test('model string and order fallbacks preserve AOT behavior', () {
+    expect(
+      DickServiceTicket.fromJson({'subject': ' Ticket '}).subject,
+      ' Ticket ',
+    );
+    expect(DickServiceTicket.fromJson({'subject': ''}).subject, '');
+    expect(DickServiceTicket.fromJson({'subject': 42}).subject, '42');
+    expect(
+      DickServiceTicket.fromJson({
+        'created_at': 'old',
+        'updated_at': 'new',
+      }).updatedAt,
+      'new',
+    );
+    expect(
+      DickServiceSubscribe.fromJson({
+        'plan': {'name': ' Plan '},
+      }).planName,
+      ' Plan ',
+    );
+    final userOrder = DickServiceUserOrder.fromJson({
+      'id': 42,
+      'plan': {'name': 'Nested plan'},
+    });
+    expect(userOrder.tradeNo, '42');
+    expect(userOrder.planName, 'Nested plan');
+    expect(DickServiceOrder.fromJson({'id': 43}).tradeNo, '43');
   });
 
   test('checkout rejects malformed payload with service error', () {

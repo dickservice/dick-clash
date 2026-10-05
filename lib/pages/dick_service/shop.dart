@@ -134,9 +134,9 @@ class _PlanCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(plan.name, style: Theme.of(context).textTheme.titleLarge),
-        if (plan.content.isNotEmpty) ...[
+        if (plan.contentPreview.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(plan.content),
+          Text(plan.contentPreview),
         ],
         if (plan.tags.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -154,11 +154,7 @@ class _PlanCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               for (final price in plan.priceOptions)
-                Chip(
-                  label: Text(
-                    '${price.formattedPrice}${price.period == null ? '' : ' · ${price.period}'}',
-                  ),
-                ),
+                Chip(label: Text('${price.formattedPrice} · ${price.id}')),
             ],
           ),
         const SizedBox(height: 12),
@@ -278,7 +274,7 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '当前选择：${_price.period ?? '--'} · ${_price.formattedPrice}',
+                '当前选择：${_price.id} · ${_price.formattedPrice}',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -292,9 +288,7 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
                 for (final price in widget.plan.priceOptions)
                   DropdownMenuItem(
                     value: price,
-                    child: Text(
-                      '${price.period ?? '--'} · ${price.formattedPrice}',
-                    ),
+                    child: Text('${price.id} · ${price.formattedPrice}'),
                   ),
               ],
               onChanged: _busy

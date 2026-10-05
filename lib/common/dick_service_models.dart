@@ -50,48 +50,34 @@ String _stringValue(dynamic v, {String fallback = ''}) {
   return v.toString();
 }
 
-// DickServiceTicket — size 0x28, fields: subject/status/replyStatus/level/createdAt/updatedAt/id
+// DickServiceTicket — size 0x28, fields: subject/status/replyStatus/level/updatedAt
 // Default subject "未命名工单", replyStatusText logic verified.
 class DickServiceTicket {
-  final int id;
   final String subject;
   final int status;
   final int replyStatus;
   final int level;
-  final String createdAt;
   final String updatedAt;
 
   const DickServiceTicket({
-    required this.id,
     required this.subject,
     required this.status,
     required this.replyStatus,
     required this.level,
-    required this.createdAt,
     required this.updatedAt,
   });
 
   factory DickServiceTicket.fromJson(Map<String, dynamic> json) {
-    final id = _intValue(json['id']);
-    final rawSubject = json['subject'];
-    String subject;
-    if (rawSubject is String && rawSubject.trim().isNotEmpty) {
-      subject = rawSubject.trim();
-    } else {
-      subject = '未命名工单';
-    }
+    final subject = json['subject']?.toString() ?? '未命名工单';
     final status = _intValue(json['status']);
     final replyStatus = _intValue(json['reply_status']);
     final level = _intValue(json['level']);
-    final createdAt = _stringValue(json['created_at']);
     final updatedAt = _stringValue(json['updated_at']);
     return DickServiceTicket(
-      id: id,
       subject: subject,
       status: status,
       replyStatus: replyStatus,
       level: level,
-      createdAt: createdAt,
       updatedAt: updatedAt,
     );
   }
@@ -112,10 +98,8 @@ class DickServiceSubscribe {
   final int u;
   final int d;
   final int? resetDay;
-  final int? resetPrice;
-  final int? resetTraffic;
+  final int resetPrice;
   final int planId;
-  final Map<String, dynamic>? plan;
 
   const DickServiceSubscribe({
     required this.planName,
@@ -125,10 +109,8 @@ class DickServiceSubscribe {
     required this.u,
     required this.d,
     this.resetDay,
-    this.resetPrice,
-    this.resetTraffic,
+    this.resetPrice = 0,
     required this.planId,
-    this.plan,
   });
 
   // AOT tolerant: checks "plan" map vs root, "plan_id", "expired_at", "transfer_enable", "u"/"d", "reset_day", "name"
@@ -143,16 +125,18 @@ class DickServiceSubscribe {
     final u = _firstNullableInt(a, b, 'u') ?? 0;
     final d = _firstNullableInt(a, b, 'd') ?? 0;
     final resetDay = _firstNullableInt(a, b, 'reset_day');
-    final prices = planMap == null ? null : _firstMap(planMap, null, 'prices');
-    final resetPrice =
-        _nullableInt(prices?['reset_price']) ??
-        _nullableInt(planMap?['reset_price']);
-    final resetTraffic = _nullableInt(prices?['reset_traffic']);
+    final rawPrices = planMap?['prices'];
+    final nestedResetTraffic = rawPrices is Map
+        ? rawPrices['reset_traffic']
+        : null;
+    final resetPrice = _intValue(nestedResetTraffic ?? planMap?['reset_price']);
 
     String planName = '暂无套餐';
     if (planMap != null) {
       final n = planMap['name'];
-      if (n is String && n.trim().isNotEmpty) planName = n.trim();
+      if (n != null && n.toString().trim().isNotEmpty) {
+        planName = n.toString();
+      }
     }
     final hasActivePlan = planId > 0 || planMap != null;
     return DickServiceSubscribe(
@@ -164,9 +148,7 @@ class DickServiceSubscribe {
       d: d,
       resetDay: resetDay,
       resetPrice: resetPrice,
-      resetTraffic: resetTraffic,
       planId: planId,
-      plan: planMap,
     );
   }
 
@@ -240,45 +222,33 @@ class DickServiceSubscribe {
   String get formattedTotalTraffic => _formatBytes(transferEnable);
   String get formattedUsedTraffic => _formatBytes(u + d);
   String get formattedRemainingTraffic => _formatBytes(remainingTraffic());
-  String get contentPreview =>
-      '$planName · $formattedRemainingTraffic / $formattedTotalTraffic';
 }
 
 class DickServiceGiftCardRedeemResult {
   final String message;
   final String templateName;
-  final int? planId;
-  final List<dynamic> rewards;
-  final List<dynamic> inviteRewards;
+  final Map<String, dynamic> rewards;
+  final Map<String, dynamic> inviteRewards;
 
   const DickServiceGiftCardRedeemResult({
     required this.message,
     required this.templateName,
-    this.planId,
     required this.rewards,
     required this.inviteRewards,
   });
 
   factory DickServiceGiftCardRedeemResult.fromJson(Map<String, dynamic> json) {
-    final msg =
-        json['message'] is String &&
-            (json['message'] as String).trim().isNotEmpty
-        ? (json['message'] as String).trim()
-        : '兑换成功';
+    final msg = json['message']?.toString() ?? '兑换成功';
     final tpl = _stringValue(json['template_name']);
-    final pid = _nullableInt(json['plan_id']);
-    List<dynamic> rewards = const [];
-    if (json['rewards'] is List) {
-      rewards = List<dynamic>.from(json['rewards'] as List);
-    }
-    List<dynamic> invite = const [];
-    if (json['invite_rewards'] is List) {
-      invite = List<dynamic>.from(json['invite_rewards'] as List);
-    }
+    final rewards = json['rewards'] is Map
+        ? Map<String, dynamic>.from(json['rewards'] as Map)
+        : const <String, dynamic>{};
+    final invite = json['invite_rewards'] is Map
+        ? Map<String, dynamic>.from(json['invite_rewards'] as Map)
+        : const <String, dynamic>{};
     return DickServiceGiftCardRedeemResult(
       message: msg,
       templateName: tpl,
-      planId: pid,
       rewards: rewards,
       inviteRewards: invite,
     );
@@ -286,75 +256,61 @@ class DickServiceGiftCardRedeemResult {
 
   String get summary {
     final sections = <String>[];
+    if (templateName.isNotEmpty) sections.add(templateName);
     if (rewards.isNotEmpty) sections.add(_formatRewards(rewards));
     if (inviteRewards.isNotEmpty) {
       sections.add('邀请奖励：${_formatRewards(inviteRewards)}');
     }
-    return sections.isEmpty ? message : sections.join('；');
+    return sections.isEmpty ? message : '$message：${sections.join('；')}';
   }
 
-  static String _formatRewards(List<dynamic> list) {
-    if (list.isEmpty) return '兑换成功';
-    return list.map((e) => e.toString()).join('，');
+  static String _formatRewards(Map<String, dynamic> rewards) {
+    return rewards.entries
+        .where((entry) => entry.value?.toString().isNotEmpty ?? false)
+        .map((entry) => '${entry.key}: ${entry.value}')
+        .join('，');
   }
 }
 
 class DickServiceUserOrder {
-  final int? id;
-  final String plan;
   final String planName;
   final String tradeNo;
-  final String name;
   final int status;
-  final int totalAmount; // cents?
+  final int totalAmount;
   final String period;
-  final List<String> tags;
-  final String? createdAt;
+  final String createdAt;
 
   const DickServiceUserOrder({
-    this.id,
-    required this.plan,
     required this.planName,
     required this.tradeNo,
-    required this.name,
     required this.status,
     required this.totalAmount,
     required this.period,
-    required this.tags,
-    this.createdAt,
+    required this.createdAt,
   });
 
   factory DickServiceUserOrder.fromJson(Map<String, dynamic> json) {
-    final plan = _stringValue(json['plan']);
+    final rawPlan = json['plan'];
+    final nestedPlanName = rawPlan is Map ? rawPlan['name'] : null;
     final planName = _stringValue(
-      json['plan_name'] ?? json['planName'] ?? json['name'],
+      json['plan_name'] ?? json['planName'] ?? nestedPlanName,
+      fallback: '未命名套餐',
     );
-    final tradeNo = _stringValue(json['trade_no'] ?? json['tradeNo']);
-    final name = _stringValue(json['name']);
+    final tradeNo = _stringValue(
+      json['trade_no'] ?? json['tradeNo'] ?? json['id'],
+    );
     final status = _intValue(json['status']);
     final totalAmount = _intValue(
       json['total_amount'] ?? json['totalAmount'] ?? json['amount'],
     );
     final period = _stringValue(json['period']);
-    List<String> tags = const [];
-    if (json['tags'] is List) {
-      tags = (json['tags'] as List).map((e) => e.toString()).toList();
-    }
-    final createdAt = json['created_at'] is String
-        ? json['created_at'] as String
-        : json['createdAt'] is String
-        ? json['createdAt'] as String
-        : null;
+    final createdAt = _stringValue(json['created_at'] ?? json['createdAt']);
     return DickServiceUserOrder(
-      plan: plan,
       planName: planName,
-      id: _nullableInt(json['id']),
       tradeNo: tradeNo,
-      name: name,
       status: status,
       totalAmount: totalAmount,
       period: period,
-      tags: tags,
       createdAt: createdAt,
     );
   }
@@ -378,15 +334,13 @@ class DickServiceUserOrder {
 
 class DickServiceOrder {
   final String tradeNo;
-  final String? tradeNoAlt;
 
-  const DickServiceOrder({required this.tradeNo, this.tradeNoAlt});
+  const DickServiceOrder({required this.tradeNo});
 
   factory DickServiceOrder.fromJson(Map<String, dynamic> json) {
-    final a = _stringValue(json['trade_no']);
-    final b = _stringValue(json['tradeNo']);
-    final v = a.isNotEmpty ? a : b;
-    return DickServiceOrder(tradeNo: v, tradeNoAlt: b.isEmpty ? null : b);
+    return DickServiceOrder(
+      tradeNo: _stringValue(json['trade_no'] ?? json['tradeNo'] ?? json['id']),
+    );
   }
 }
 
@@ -405,55 +359,58 @@ class DickServicePriceOption {
   final String id;
   final int price; // cents
   final String? period;
-  final int? resetPrice;
 
   const DickServicePriceOption({
     required this.id,
     required this.price,
     this.period,
-    this.resetPrice,
   });
 
   String get formattedPrice => '¥${_formatCents(price)}';
 }
 
 class DickServicePlan {
+  static const periodLabels = <String, String>{
+    'month_price': '月付',
+    'quarter_price': '季付',
+    'half_year_price': '半年',
+    'year_price': '年付',
+    'two_year_price': '两年',
+    'three_year_price': '三年',
+    'onetime_price': '一次性',
+  };
+
   final int id;
   final String name;
   final String content;
   final List<String> tags;
-  final List<DickServicePriceOption> prices;
+  final int transferEnable;
+  final bool show;
+  final Map<String, int> prices;
 
   const DickServicePlan({
     required this.id,
     required this.name,
     required this.content,
     required this.tags,
+    required this.transferEnable,
+    required this.show,
     required this.prices,
   });
 
   factory DickServicePlan.fromJson(Map<String, dynamic> json) {
     final id = _intValue(json['id']);
-    final name =
-        json['name'] is String && (json['name'] as String).trim().isNotEmpty
-        ? (json['name'] as String).trim()
-        : '未命名套餐';
+    final name = json['name']?.toString() ?? '未命名套餐';
     final content = _stringValue(json['content']);
     List<String> tags = const [];
     if (json['tags'] is List) {
       tags = (json['tags'] as List).map((e) => e.toString()).toList();
     }
-    final prices = <DickServicePriceOption>[];
-    final rawPrices = json['prices'];
-    if (rawPrices is Map) {
-      for (final entry in rawPrices.entries) {
-        final period = entry.key.toString();
-        final price = _positiveInt(entry.value);
-        if (price > 0) {
-          prices.add(
-            DickServicePriceOption(id: period, price: price, period: period),
-          );
-        }
+    final prices = <String, int>{};
+    for (final period in periodLabels.keys) {
+      final price = _positivePlanPrice(json[period]);
+      if (price > 0) {
+        prices[period] = price;
       }
     }
     return DickServicePlan(
@@ -461,15 +418,32 @@ class DickServicePlan {
       name: name,
       content: content,
       tags: tags,
+      transferEnable: _intValue(json['transfer_enable']),
+      show: json['show'] != false,
       prices: prices,
     );
   }
 
-  List<DickServicePriceOption> get priceOptions => prices;
+  List<DickServicePriceOption> get priceOptions => prices.entries
+      .map(
+        (entry) => DickServicePriceOption(
+          id: periodLabels[entry.key]!,
+          price: entry.value,
+          period: entry.key,
+        ),
+      )
+      .toList(growable: false);
+
+  String get contentPreview => content
+      .replaceAll('*', '')
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .join('\n');
 }
 
-int _positiveInt(dynamic value) {
-  final parsed = _intValue(value);
+int _positivePlanPrice(dynamic value) {
+  final parsed = value is String ? int.tryParse(value) ?? 0 : _intValue(value);
   return parsed > 0 ? parsed : 0;
 }
 

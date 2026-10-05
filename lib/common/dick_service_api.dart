@@ -62,6 +62,7 @@ class DickServiceApi {
     if (data is! List) throw Exception('套餐列表返回格式异常');
     return data
         .map((e) => DickServicePlan.fromJson(Map<String, dynamic>.from(e)))
+        .where((plan) => plan.show)
         .toList();
   }
 

@@ -103,7 +103,7 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
                   leading: CircleAvatar(child: Text('${ticket.level}')),
                   title: Text(ticket.subject),
                   subtitle: Text(
-                    '${ticket.replyStatusText}\n${ticket.createdAt}',
+                    '${ticket.replyStatusText}\n${ticket.updatedAt}',
                   ),
                   isThreeLine: true,
                   trailing: Text(ticket.status == 0 ? '处理中' : '已关闭'),

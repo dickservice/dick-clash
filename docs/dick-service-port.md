@@ -128,24 +128,37 @@ This document now records the current workdir
   `Map<String, dynamic>.from` conversion. Non-map list elements are not
   silently filtered (AOT `LinkedHashMap.from` at `0x8b668c`, `0x90db00`,
   `0x920608`).
-- Plan prices are period-keyed positive numeric values and preserve string
-  price IDs (`DickServicePlan.fromJson` `0x8b66b0`).
+- Plan prices are period-keyed positive numeric values. The APK reads the
+  seven root keys `month_price` through `onetime_price`, maps them to the
+  labels `月付` through `一次性`, and filters plans whose `show` value is
+  exactly `false` (`0x8b6a0c`, `0x8b650c`; period map at `pp+0x2fad8`).
 - Order fetch supports `data.orders` and direct-list shapes
   (`0x90d8d4..0x90d9dc`); ticket fetch supports `data.tickets` and direct-list
   (`0x92048c..0x92058c`).
+- User-order identifiers fall back through `trade_no`, `tradeNo`, and `id`;
+  plan names fall back through `plan_name`, `planName`, and nested
+  `plan.name` (`0x90dc84..0x90e02c`). Ticket cards use `updated_at`, matching
+  the sole timestamp stored in the APK ticket object (`0x9209a4..0x920acc`).
+- Gift-card `rewards` and `invite_rewards` are maps, not lists. The APK drops
+  entries with null/empty values and formats each as `key: value`, preserving
+  the message, optional template name, and invitation prefix
+  (`0x90c084..0x90c568`, `0x90c7d8..0x90cba0`).
 - Traffic reset retains the dedicated `createTrafficResetOrder` boundary
   (`0x8b3c60`) delegating to `createOrder` with period `reset_price`.
 - Observed write bodies for order create/checkout/cancel, gift-card redeem,
   ticket create, and reset-security are implemented.
 - Checkout response parsing supports URL and HTML branches without issuing an
   unverified payment request, preserving `支付链接返回为空`.
-- `DickServiceSubscribe.resetTraffic` and `resetPrice` are derived from the
-  selected `plan.prices` map only (`0x6867a4..0x686e64`). A payload with no
-  `plan` map does not gain reset values from a root-level `prices` map.
+- The APK has one subscription reset-price field. Its intentionally preserved
+  lookup is `plan.prices.reset_traffic ?? plan.reset_price`, followed by
+  integer coercion (`0x686d24..0x686ea0`); Mine then uses that field as the
+  traffic-reset order price (`0x8b2f5c`). A root-level `prices` map and
+  `plan.prices.reset_price` are ignored.
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
   closure `0x67b754` is preserved; it gates the outer login 401/422 check.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
-  non-map rejection (`TypeError`), subscribe semantics, gift summary,
+  non-map rejection (`TypeError`), subscribe semantics, map-based gift
+  summary, plan visibility/root price keys,
   checkout errors, login bodies/validation, and write bodies.
 
 ### Account and state
