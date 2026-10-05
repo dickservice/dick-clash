@@ -70,9 +70,11 @@ class _DickServiceOrdersPageState extends State<DickServiceOrdersPage> {
             );
           }
           if (snapshot.data!.isEmpty) {
-            return const DickServiceStateView(
+            return DickServiceStateView(
               icon: Icons.receipt_long_outlined,
               title: '暂无订单',
+              onRetry: _reload,
+              retryLabel: '刷新',
             );
           }
           final orders = snapshot.data!;

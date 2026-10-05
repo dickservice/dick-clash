@@ -74,9 +74,11 @@ class _DickServiceTicketsPageState extends State<DickServiceTicketsPage> {
             );
           }
           if (snapshot.data!.isEmpty) {
-            return const DickServiceStateView(
+            return DickServiceStateView(
               icon: Icons.support_agent,
               title: '暂无工单',
+              onRetry: _openCreate,
+              retryLabel: '新建工单',
             );
           }
           final tickets = snapshot.data!;

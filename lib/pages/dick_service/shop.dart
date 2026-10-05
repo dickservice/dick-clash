@@ -64,9 +64,11 @@ class _DickServiceShopPageState extends State<DickServiceShopPage> {
           }
           final plans = snapshot.data!;
           if (plans.isEmpty) {
-            return const DickServiceStateView(
+            return DickServiceStateView(
               icon: Icons.inventory_2_outlined,
               title: '暂无可购买套餐',
+              onRetry: _reload,
+              retryLabel: '刷新',
             );
           }
           return ListView.separated(
