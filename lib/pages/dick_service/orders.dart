@@ -221,28 +221,32 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
             if (order.status == 0)
-              FilledButton.icon(
-                onPressed: onPay,
-                icon: paying
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.payment),
-                label: Text(paying ? '正在打开...' : '继续支付'),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onPay,
+                  icon: paying
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.payment),
+                  label: Text(paying ? '正在打开...' : '继续支付'),
+                ),
               ),
             if (order.status == 1)
-              OutlinedButton.icon(
-                onPressed: onCancel,
-                icon: cancelling
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.close),
-                label: Text(cancelling ? '取消中...' : '取消支付'),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCancel,
+                  icon: cancelling
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.close),
+                  label: Text(cancelling ? '取消中...' : '取消支付'),
+                ),
               ),
           ],
         ),

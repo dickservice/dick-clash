@@ -149,6 +149,10 @@ This document now records the current workdir
   ticket create, and reset-security are implemented.
 - Checkout response parsing supports URL and HTML branches without issuing an
   unverified payment request, preserving `支付链接返回为空`.
+- Order-card payment and cancellation actions use expanded controls that fill
+  the available action row, matching the APK's `Expanded` wrappers around the
+  `继续支付` and `取消支付` buttons (`0xab23ec..0xab2410`,
+  `0xab25b4..0xab25d8`).
 - The payment WebView reports navigation progress into state and renders a
   determinate `LinearProgressIndicator` while progress is below 100
   (`0x985268..0x985324`, `0x90efe4..0x90f088`). Its order number is shown in
