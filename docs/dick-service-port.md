@@ -45,6 +45,10 @@ Subsequent verified page/model checkpoints are now integrated through
 - The remaining-time label checks whether the full duration is negative before
   truncating to days, so an expiry from earlier today is `已过期` rather than
   `今天到期` (`0x8f4ca8–0x8f4cd4`).
+- Purchase recovery now matches the APK's `_findLatestPayableTradeNo`
+  fallback (`0x91f174–0x91f670`): when `order/save` returns no trade number,
+  re-fetch orders and select a non-empty, status-0 order with the selected
+  plan and period before calling checkout.
 
 The focused Dick Service API/cache/script suites pass 18 tests after these
 changes, targeted analysis is clean, both native asset hooks are restored to

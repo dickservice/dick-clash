@@ -231,12 +231,25 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
         widget.plan.id,
         couponCode: coupon.isEmpty ? null : coupon,
       );
-      if (order.tradeNo.isEmpty) throw StateError('订单号返回为空');
-      final checkout = await widget.api.checkoutOrder(
-        token,
-        order.tradeNo,
-        _method,
-      );
+      var tradeNo = order.tradeNo.trim();
+      if (tradeNo.isEmpty) {
+        // The APK re-fetches orders when order/save omits trade_no. The API
+        // response can lag behind order creation, so select the newest
+        // unpaid order matching the selected plan and period.
+        final orders = await widget.api.fetchOrders(token);
+        final matching = orders.where(
+          (candidate) =>
+              candidate.tradeNo.trim().isNotEmpty &&
+              candidate.status == 0 &&
+              candidate.planName.trim() == widget.plan.name.trim() &&
+              candidate.period?.trim() == period,
+        );
+        if (matching.isNotEmpty) tradeNo = matching.first.tradeNo.trim();
+      }
+      if (tradeNo.isEmpty) {
+        throw StateError('订单已创建，但未找到可支付订单');
+      }
+      final checkout = await widget.api.checkoutOrder(token, tradeNo, _method);
       if (!mounted) return;
       final paymentContext = widget.paymentContext;
       if (!paymentContext.mounted) return;
@@ -244,7 +257,7 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
       await openDickServicePaymentPage(
         paymentContext,
         checkout: checkout,
-        tradeNo: order.tradeNo,
+        tradeNo: tradeNo,
       );
     } catch (error) {
       if (mounted) setState(() => _error = compactError(error));

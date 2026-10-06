@@ -368,6 +368,45 @@ void main() {
     expect(result.summary, '兑换成功：会员礼品卡；套餐: 月付；邀请奖励：余额: 100');
   });
 
+  test('order model exposes fields needed by APK payable-order fallback', () {
+    final orders = [
+      DickServiceUserOrder.fromJson({
+        'trade_no': '',
+        'plan_name': 'Plan',
+        'period': 'month_price',
+        'status': 0,
+      }),
+      DickServiceUserOrder.fromJson({
+        'trade_no': 'closed',
+        'plan_name': 'Plan',
+        'period': 'month_price',
+        'status': 6,
+      }),
+      DickServiceUserOrder.fromJson({
+        'trade_no': 'other-period',
+        'plan_name': 'Plan',
+        'period': 'year_price',
+        'status': 0,
+      }),
+      DickServiceUserOrder.fromJson({
+        'trade_no': 'payable',
+        'plan_name': 'Plan',
+        'period': 'month_price',
+        'status': 0,
+      }),
+    ];
+    final payable = orders
+        .where(
+          (order) =>
+              order.tradeNo.trim().isNotEmpty &&
+              order.status == 0 &&
+              order.planName.trim() == 'Plan' &&
+              order.period?.trim() == 'month_price',
+        )
+        .first;
+    expect(payable.tradeNo, 'payable');
+  });
+
   test('plan parsing preserves APK root price keys and visibility', () {
     final plan = DickServicePlan.fromJson({
       'id': 7,
