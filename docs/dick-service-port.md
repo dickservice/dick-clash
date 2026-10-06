@@ -110,11 +110,13 @@ This document now records the current workdir
 
 ### Android Crashlytics state logging (`android/common/.../GlobalState.kt`)
 
-- Dick's remote-service Binder method `G(Z)` calls the Crashlytics toggle and
-  emits the exact disabled-state log `crashlytics disabled for AuroraDeck` when
-  passed `false` (`decoded-dick/smali/I1/t.smali`, lines 64-78). The fork now
-  preserves that log in `GlobalState.setCrashlytics`; the actual Firebase
-  collection toggle and the default-enabled state remain unchanged.
+- Dick's remote-service Binder method `G(Z)` emits the exact log
+  `crashlytics disabled for AuroraDeck` when passed `true`, and emits no such
+  log for `false` (`decoded-dick/smali/I1/t.smali`, lines 64-78). The same
+  true-branch is also reachable from the service state synchronization path in
+  `decoded-dick/smali/E1/a0.smali`. The fork preserves the APK's counterintuitive
+  branch in `GlobalState.setCrashlytics`; the actual Firebase collection toggle
+  and the default-enabled state remain unchanged.
 - The identical native/Firebase libraries and manifest components do not prove
   a different telemetry policy, so no Firebase dependency or resource change is
   made from static APK evidence alone.
@@ -256,8 +258,9 @@ This document now records the current workdir
   unknown.
 - Logout clears auth, alert, bootstrap, and expiry state. AOT also resolves
   the subscription URL and iterates profiles via predicate `0x8b5298`/`0x67bb44`;
-  the fork currently keeps the strict static-bound cleanup until that predicate
-  is captured.
+  the fork resolves that URL and removes every profile whose URL exactly
+  matches it. The static bound marker remains the separate profile-creation and
+  account-bound predicate.
 
 ### Built-in script and navigation
 

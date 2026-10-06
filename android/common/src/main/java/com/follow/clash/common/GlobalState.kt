@@ -40,9 +40,7 @@ object GlobalState : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatch
         FirebaseApp.initializeApp(application)
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = enable
         if (enable) {
-            log("Crashlytics enabled")
-        } else {
-            // Dick Service's Binder path records the disabled state explicitly.
+            // Dick's Binder path records this APK quirk when the shared state is true.
             log("crashlytics disabled for AuroraDeck")
         }
     }
