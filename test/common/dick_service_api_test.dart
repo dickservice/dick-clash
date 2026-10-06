@@ -301,6 +301,19 @@ void main() {
     );
     expect(subscribe.remainingTimeText(), '长期有效');
     expect(
+      DickServiceSubscribe(
+        planName: 'Recently expired',
+        hasActivePlan: true,
+        expiredAt: nowSeconds - 3600,
+        transferEnable: 0,
+        u: 0,
+        d: 0,
+        planId: 1,
+      ).remainingTimeText(),
+      '已过期',
+      reason: 'AOT checks a negative duration before truncating it with inDays',
+    );
+    expect(
       subscribe.normalizedExpiredAt(),
       -1,
       reason: 'AOT 0x6865f8 normalizes an active plan without expiry',

@@ -203,8 +203,11 @@ class DickServiceSubscribe {
   String remainingTimeText() {
     if (!hasActivePlan) return '未开通/已过期';
     if (expiredAt <= 0) return '长期有效';
-    final days = expireTime().difference(DateTime.now()).inDays;
-    if (days < 0) return '已过期';
+    final remaining = expireTime().difference(DateTime.now());
+    // AOT checks the duration sign before truncating to whole days. Without
+    // this guard, an expiry a few hours ago is incorrectly shown as today.
+    if (remaining.isNegative) return '已过期';
+    final days = remaining.inDays;
     if (days == 0) return '今天到期';
     return '剩余 $days 天';
   }
