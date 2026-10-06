@@ -200,6 +200,8 @@ class _PurchaseSheetState extends State<_PurchaseSheet> {
   }
 
   Future<void> _submit() async {
+    // AOT returns immediately while the purchase request is already running.
+    if (_busy) return;
     final period = _price.period;
     if (period == null || period.isEmpty) {
       setState(() => _error = '购买周期不可用');
