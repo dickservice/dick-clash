@@ -151,7 +151,10 @@ This document now records the current workdir
   unverified payment request, preserving `支付链接返回为空`.
 - The payment WebView reports navigation progress into state and renders a
   determinate `LinearProgressIndicator` while progress is below 100
-  (`0x985268..0x985324`, `0x90efe4..0x90f088`).
+  (`0x985268..0x985324`, `0x90efe4..0x90f088`). Its order number is shown in
+  the body header, and the AOT conditional `返回` text button appears only
+  when WebView history can go back; it calls `goBack()` and refreshes that
+  state (`0x90ee04..0x90ee48`, `0x91d864..0x91d8f0`).
 - The APK has one subscription reset-price field. Its intentionally preserved
   lookup is `plan.prices.reset_traffic ?? plan.reset_price`, followed by
   integer coercion (`0x686d24..0x686ea0`); Mine then uses that field as the

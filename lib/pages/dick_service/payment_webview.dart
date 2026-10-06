@@ -68,6 +68,12 @@ class _DickServicePaymentWebViewPageState
     return true;
   }
 
+  Future<void> _goBack() async {
+    if (!await _controller.canGoBack()) return;
+    await _controller.goBack();
+    await _updateCanGoBack();
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_canGoBack,
@@ -77,11 +83,6 @@ class _DickServicePaymentWebViewPageState
     child: DickServiceScaffold(
       title: '订单支付',
       actions: [
-        if (widget.tradeNo != null && widget.tradeNo!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(child: Text('订单号：${widget.tradeNo}')),
-          ),
         IconButton(
           onPressed: _controller.reload,
           tooltip: '刷新',
@@ -95,6 +96,20 @@ class _DickServicePaymentWebViewPageState
       ],
       body: Column(
         children: [
+          Row(
+            children: [
+              if (widget.tradeNo != null && widget.tradeNo!.isNotEmpty)
+                Expanded(child: Text('订单号：${widget.tradeNo}'))
+              else
+                const Spacer(),
+              if (_canGoBack)
+                TextButton.icon(
+                  onPressed: _goBack,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('返回'),
+                ),
+            ],
+          ),
           if (_progress < 100) LinearProgressIndicator(value: _progress / 100),
           Expanded(child: WebViewWidget(controller: _controller)),
         ],
