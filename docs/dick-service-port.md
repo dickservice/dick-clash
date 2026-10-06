@@ -108,6 +108,17 @@ This document now records the current workdir
   the fork interface's core destruction operation.
 
 
+### Android Crashlytics state logging (`android/common/.../GlobalState.kt`)
+
+- Dick's remote-service Binder method `G(Z)` calls the Crashlytics toggle and
+  emits the exact disabled-state log `crashlytics disabled for AuroraDeck` when
+  passed `false` (`decoded-dick/smali/I1/t.smali`, lines 64-78). The fork now
+  preserves that log in `GlobalState.setCrashlytics`; the actual Firebase
+  collection toggle and the default-enabled state remain unchanged.
+- The identical native/Firebase libraries and manifest components do not prove
+  a different telemetry policy, so no Firebase dependency or resource change is
+  made from static APK evidence alone.
+
 ### API and models (`lib/common/dick_service_api.dart`, `lib/common/dick_service_models.dart`)
 
 - Base URL: `https://airport.dicksupport.top`.

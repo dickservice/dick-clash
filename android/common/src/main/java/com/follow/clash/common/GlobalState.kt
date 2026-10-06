@@ -41,6 +41,9 @@ object GlobalState : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatch
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = enable
         if (enable) {
             log("Crashlytics enabled")
+        } else {
+            // Dick Service's Binder path records the disabled state explicitly.
+            log("crashlytics disabled for AuroraDeck")
         }
     }
 
