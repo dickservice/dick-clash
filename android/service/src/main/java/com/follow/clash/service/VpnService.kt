@@ -1,6 +1,7 @@
 package com.follow.clash.service
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.ProxyInfo
 import android.os.Binder
@@ -224,6 +225,13 @@ class VpnService : SystemVpnService(), ManagedService {
         }
     }
 
+    private fun addApplication(name: String, add: (String) -> Builder) {
+        try {
+            add(name)
+        } catch (_: PackageManager.NameNotFoundException) {
+            GlobalState.log("Access control skipped an uninstalled package: $name")
+        }
+    }
 
     override fun start() {
         try {
