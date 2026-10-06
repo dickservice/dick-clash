@@ -539,17 +539,29 @@ void main() {
     },
   );
 
-  test('login maps only HTTP 401 and 422 to invalid credentials', () async {
-    final adapter = _Adapter(statusCodes: {DickServiceApi.epLogin: 422});
-    final dio = Dio(BaseOptions(baseUrl: DickServiceApi.baseUrl))
-      ..httpClientAdapter = adapter;
-    final api = DickServiceApi(dio: dio);
-    await expectLater(
-      api.login('mail@example.com', 'secret'),
-      throwsA(predicate((error) => error.toString().contains('账号或密码错误'))),
-    );
-    dio.close();
-  });
+  test(
+    'login keeps an HTTP 422 response on the AOT normal-response path',
+    () async {
+      final adapter = _Adapter(statusCodes: {DickServiceApi.epLogin: 422});
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: DickServiceApi.baseUrl,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      )..httpClientAdapter = adapter;
+      final api = DickServiceApi(dio: dio);
+      await expectLater(
+        api.login('mail@example.com', 'secret'),
+        throwsA(
+          predicate(
+            (error) =>
+                error.toString().contains('没有可用的 Dick Service 登录入口，请稍后重试：'),
+          ),
+        ),
+      );
+      dio.close();
+    },
+  );
 
   test(
     'login wraps non-credential failures after exhausting endpoints',

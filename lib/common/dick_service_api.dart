@@ -295,14 +295,7 @@ class DickServiceApi {
     final res = await dio.post<Map<String, dynamic>>(
       endpoint.uri(epLogin).toString(),
       data: {'email': email, 'password': password},
-      options: Options(
-        headers: {'Accept': 'application/json'},
-        // Ensure 401/422 surface as DioException so login can map them to
-        // 账号或密码错误, matching AOT 0x88ba8c-0x88bb2c; global validateStatus
-        // is <500 and would otherwise swallow them as normal responses.
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 300,
-      ),
+      options: Options(headers: {'Accept': 'application/json'}),
     );
     final response = _asMap(res.data);
     final data = _unwrap(response);

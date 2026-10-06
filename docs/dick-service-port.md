@@ -75,11 +75,11 @@ The previous integrated checkpoint was committed and pushed as `5e9c9d6`
   `d2b761ac9b854c16fe4df2108e1c34c3fd889d7a55c867a306227de8aa0df55c`.
 
 The earlier `c25c2cb` checkpoint had the broader 61-test integration suite.
-Since then the residual audit corrections (login error mapping
-`0x88ba8c` 401/422, plan fetch without `_throwIfFailed` `0x8b631c`, strict
-`Map.from` list conversion, `plan.prices`-only reset provenance
-`0x6867a4`, and logout/profile gate alignment) were integrated and verified
-before `5e9c9d6` was pushed.
+Since then the residual audit corrections (login's outer DioException mapping
+`0x88ba8c`, plan fetch without `_throwIfFailed` `0x8b631c`, strict `Map.from`
+list conversion, `plan.prices`-only reset provenance `0x6867a4`, and
+logout/profile gate alignment) were integrated and verified before `5e9c9d6`
+was pushed.
 
 This document now records the current workdir
 `/root/.openclaw/workspace/work/flclash-diff/fork` (the previously cited
@@ -125,10 +125,12 @@ This document now records the current workdir
   `POST /api/v1/user/order/cancel`, `GET /api/v1/user/ticket/fetch`,
   `POST /api/v1/user/ticket/save`, `POST /api/v1/user/gift-card/redeem`,
   `GET /api/v1/user/resetSecurity`.
-- Outer `login` maps only HTTP 401 and 422 Dio responses to `账号或密码错误`
-  (AOT `0x88ba8c` class `0xb52`, tagged `0x322`/`0x34c`). Server-level
-  `fail`/`error` responses continue through `_throwIfFailed` (`0x67ac6c`) and
-  preserve their server message.
+- Outer `login` maps only caught DioExceptions with HTTP 401 or 422 to
+  `账号或密码错误` (AOT `0x88ba8c`, class `0xb52`, tagged `0x322`/`0x34c`).
+  The global `<500` status validator remains in effect for the login request,
+  so ordinary HTTP 401/422 response bodies follow `_asMap`/`_unwrap`; there is
+  no login-specific 2xx validator. Server-level `fail`/`error` responses
+  continue through `_throwIfFailed` (`0x67ac6c`) and preserve their message.
 - `fetchPlans` does not call `_throwIfFailed` before reading `data`; a
   `{status: fail}` response reaches `套餐列表返回格式异常` as in AOT `0x8b631c`.
 - Plan, order, and ticket list mapping uses strict
@@ -212,7 +214,8 @@ This document now records the current workdir
   (`0x83b420..0x83b4f8`). Later resume/timer checks retain responsibility for
   revalidation.
 - `validateStatus: (s) => s != null && s < 500` at `0x67b090` with false
-  closure `0x67b754` is preserved; it gates the outer login 401/422 check.
+  closure `0x67b754` is preserved globally, including the login request; the
+  outer 401/422 mapping applies only when a DioException is actually thrown.
 - Tests cover signing, UUID-v4 nonce, typed list unwrapping, strict
   non-map rejection (`TypeError`), subscribe semantics, map-based gift
   summary, plan visibility/root price keys,
