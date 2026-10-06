@@ -2,7 +2,7 @@ package com.follow.clash.core
 
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.URI
+import java.net.URL
 
 object Core {
     private external fun startTun(
@@ -11,7 +11,7 @@ object Core {
         stack: String,
         address: String,
         dns: String,
-    ): Boolean
+    )
 
     external fun forceGC()
 
@@ -20,39 +20,38 @@ object Core {
     )
 
     private fun parseInetSocketAddress(address: String): InetSocketAddress {
-        val uri = URI("tcp://$address")
-        val host = requireNotNull(uri.host) { "Missing host in address: $address" }
-        require(uri.port >= 0) { "Missing port in address: $address" }
-        return InetSocketAddress(InetAddress.getByName(host), uri.port)
+        val url = URL("https://$address")
+        return InetSocketAddress(InetAddress.getByName(url.host), url.port)
     }
 
     fun startTun(
         fd: Int,
         protect: (Int) -> Boolean,
-        resolveUid: (protocol: Int, source: InetSocketAddress, target: InetSocketAddress) -> Int,
-        resolvePackage: (uid: Int) -> String,
+        resolverProcess: (protocol: Int, source: InetSocketAddress, target: InetSocketAddress, uid: Int) -> String,
         stack: String,
         address: String,
         dns: String,
-    ): Boolean {
-        return startTun(
+    ) {
+        startTun(
             fd,
             object : TunInterface {
-                override fun protect(fd: Int): Boolean = protect(fd)
+                override fun protect(fd: Int) {
+                    protect(fd)
+                }
 
-                override fun resolveUid(
+                override fun resolverProcess(
                     protocol: Int,
                     source: String,
                     target: String,
-                ): Int {
-                    return resolveUid(
+                    uid: Int,
+                ): String {
+                    return resolverProcess(
                         protocol,
                         parseInetSocketAddress(source),
                         parseInetSocketAddress(target),
+                        uid,
                     )
                 }
-
-                override fun resolvePackage(uid: Int): String = resolvePackage(uid)
             },
             stack,
             address,
@@ -64,7 +63,7 @@ object Core {
         suspended: Boolean,
     )
 
-    private external fun invokeMethod(
+    private external fun invokeAction(
         data: String,
         cb: InvokeInterface,
     )
@@ -73,7 +72,7 @@ object Core {
         data: String,
         cb: (result: String?) -> Unit,
     ) {
-        invokeMethod(
+        invokeAction(
             data,
             object : InvokeInterface {
                 override fun onResult(result: String?) {

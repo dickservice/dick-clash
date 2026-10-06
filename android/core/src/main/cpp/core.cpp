@@ -7,13 +7,11 @@
 #include "bride.h"
 
 extern "C"
-JNIEXPORT jboolean JNICALL
+JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_startTun(JNIEnv *env, jobject thiz, jint fd, jobject cb,
                                          jstring stack, jstring address, jstring dns) {
     const auto interface = new_global(cb);
-    return startTUN(interface, fd, get_string(stack), get_string(address), get_string(dns))
-           ? JNI_TRUE
-           : JNI_FALSE;
+    startTUN(interface, fd, get_string(stack), get_string(address), get_string(dns));
 }
 
 extern "C"
@@ -36,9 +34,9 @@ Java_com_follow_clash_core_Core_updateDNS(JNIEnv *env, jobject thiz, jstring dns
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_follow_clash_core_Core_invokeMethod(JNIEnv *env, jobject thiz, jstring data, jobject cb) {
+Java_com_follow_clash_core_Core_invokeAction(JNIEnv *env, jobject thiz, jstring data, jobject cb) {
     const auto interface = new_global(cb);
-    invokeMethod(interface, get_string(data));
+    invokeAction(interface, get_string(data));
 }
 
 extern "C"
@@ -84,8 +82,7 @@ Java_com_follow_clash_core_Core_quickSetup(JNIEnv *env, jobject thiz, jstring in
 
 
 static jmethodID m_tun_interface_protect;
-static jmethodID m_tun_interface_resolve_uid;
-static jmethodID m_tun_interface_resolve_package;
+static jmethodID m_tun_interface_resolve_process;
 static jmethodID m_invoke_interface_result;
 
 
@@ -98,56 +95,37 @@ static void free_string_impl(char *str) {
     free(str);
 }
 
-static int call_tun_interface_protect_impl(void *tun_interface, const int fd) {
+static void call_tun_interface_protect_impl(void *tun_interface, const int fd) {
     // ART aborts the process on a call through a null object, so a callback
     // that was already released has to stop here rather than at the JNI call.
     if (tun_interface == nullptr) {
-        return 0;
+        return;
     }
     ATTACH_JNI();
-    const auto accepted = env->CallBooleanMethod(static_cast<jobject>(tun_interface),
-                                                 m_tun_interface_protect,
-                                                 fd);
-    if (jni_clear_exception(env)) {
-        return 0;
-    }
-    return accepted == JNI_TRUE ? 1 : 0;
+    env->CallVoidMethod(static_cast<jobject>(tun_interface), m_tun_interface_protect, fd);
+    jni_clear_exception(env);
 }
 
-static int call_tun_interface_resolve_uid_impl(void *tun_interface, const int protocol,
-                                               const char *source,
-                                               const char *target) {
+static char *call_tun_interface_resolve_process_impl(void *tun_interface, const int protocol,
+                                                     const char *source,
+                                                     const char *target,
+                                                     const int uid) {
     if (tun_interface == nullptr) {
-        return -1;
+        return strdup("");
     }
     ATTACH_JNI();
     const auto source_string = new_string(source);
     const auto target_string = new_string(target);
-    const auto uid = env->CallIntMethod(static_cast<jobject>(tun_interface),
-                                        m_tun_interface_resolve_uid,
-                                        protocol,
-                                        source_string,
-                                        target_string);
-    const auto failed = jni_clear_exception(env);
+    const auto package_name = reinterpret_cast<jstring>(env->CallObjectMethod(
+            static_cast<jobject>(tun_interface), m_tun_interface_resolve_process,
+            protocol, source_string, target_string, uid));
+    jni_clear_exception(env);
     if (source_string != nullptr) {
         env->DeleteLocalRef(source_string);
     }
     if (target_string != nullptr) {
         env->DeleteLocalRef(target_string);
     }
-    return failed ? -1 : uid;
-}
-
-static char *call_tun_interface_resolve_package_impl(void *tun_interface, const int uid) {
-    if (tun_interface == nullptr) {
-        return strdup("");
-    }
-    ATTACH_JNI();
-    const auto package_name = reinterpret_cast<jstring>(env->CallObjectMethod(
-            static_cast<jobject>(tun_interface),
-            m_tun_interface_resolve_package,
-            uid));
-    jni_clear_exception(env);
     const auto result = get_string(package_name);
     if (package_name != nullptr) {
         env->DeleteLocalRef(package_name);
@@ -184,18 +162,15 @@ JNI_OnLoad(JavaVM *vm, void *) {
 
     const auto c_invoke_interface = find_class("com/follow/clash/core/InvokeInterface");
 
-    m_tun_interface_protect = find_method(c_tun_interface, "protect", "(I)Z");
-    m_tun_interface_resolve_uid = find_method(c_tun_interface, "resolveUid",
-                                              "(ILjava/lang/String;Ljava/lang/String;)I");
-    m_tun_interface_resolve_package = find_method(c_tun_interface, "resolvePackage",
-                                                  "(I)Ljava/lang/String;");
+    m_tun_interface_protect = find_method(c_tun_interface, "protect", "(I)V");
+    m_tun_interface_resolve_process = find_method(c_tun_interface, "resolverProcess",
+                                                  "(ILjava/lang/String;Ljava/lang/String;I)Ljava/lang/String;");
     m_invoke_interface_result = find_method(c_invoke_interface, "onResult",
                                             "(Ljava/lang/String;)V");
 
 
     protect_func = &call_tun_interface_protect_impl;
-    resolve_uid_func = &call_tun_interface_resolve_uid_impl;
-    resolve_package_func = &call_tun_interface_resolve_package_impl;
+    resolve_process_func = &call_tun_interface_resolve_process_impl;
     result_func = &call_invoke_interface_result_impl;
     release_object_func = &release_jni_object_impl;
     free_string_func = &free_string_impl;

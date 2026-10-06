@@ -6,33 +6,23 @@ void (*release_object_func)(void *obj);
 
 void (*free_string_func)(char *data);
 
-int (*protect_func)(void *tun_interface, int fd);
+void (*protect_func)(void *tun_interface, int fd);
 
-int (*resolve_uid_func)(void *tun_interface, int protocol, const char *source, const char *target);
-
-char* (*resolve_package_func)(void *tun_interface, int uid);
+char* (*resolve_process_func)(void *tun_interface, int protocol, const char *source, const char *target, int uid);
 
 void (*result_func)(void *invoke_Interface, const char *data);
 
-int protect(void *tun_interface, int fd) {
-    if (protect_func == NULL) {
-        return 0;
+void protect(void *tun_interface, int fd) {
+    if (protect_func != NULL) {
+        protect_func(tun_interface, fd);
     }
-    return protect_func(tun_interface, fd);
 }
 
-int resolve_uid(void *tun_interface, int protocol, const char *source, const char *target) {
-    if (resolve_uid_func == NULL) {
-        return -1;
-    }
-    return resolve_uid_func(tun_interface, protocol, source, target);
-}
-
-char* resolve_package(void *tun_interface, int uid) {
-    if (resolve_package_func == NULL) {
+char* resolve_process(void *tun_interface, int protocol, const char *source, const char *target, int uid) {
+    if (resolve_process_func == NULL) {
         return NULL;
     }
-    return resolve_package_func(tun_interface, uid);
+    return resolve_process_func(tun_interface, protocol, source, target, uid);
 }
 
 void release_object(void *obj) {

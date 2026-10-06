@@ -84,10 +84,6 @@ func (th *TunHandler) clear() {
 	th.listener = nil
 }
 
-// protectFailing tracks whether the last protect call was refused, so a stuck
-// VpnService produces one log line rather than one per connection.
-var protectFailing atomic.Bool
-
 func (th *TunHandler) handleProtect(fd int) error {
 	th.mu.RLock()
 	defer th.mu.RUnlock()
@@ -100,26 +96,17 @@ func (th *TunHandler) handleProtect(fd int) error {
 		return errTunNotReady
 	}
 
-	if !protect(th.callback, fd) {
-		if protectFailing.CompareAndSwap(false, true) {
-			logError("VpnService.protect refused a socket; connections would loop back into the tunnel")
-		}
-		return errProtectRefused
-	}
-
-	if protectFailing.CompareAndSwap(true, false) {
-		log.Infoln("[TUN] VpnService.protect recovered")
-	}
+	protect(th.callback, fd)
 	return nil
 }
 
-func (th *TunHandler) handleResolveProcess(source, target net.Addr) (int, string) {
+func (th *TunHandler) handleResolveProcess(source, target net.Addr) string {
 	th.mu.RLock()
 	defer th.mu.RUnlock()
 
 	// A released callback is a null jobject, and JNI aborts on a call through one.
 	if th.listener == nil || th.callback == nil {
-		return -1, ""
+		return ""
 	}
 	var protocol int
 	switch source.Network() {
@@ -128,16 +115,11 @@ func (th *TunHandler) handleResolveProcess(source, target net.Addr) (int, string
 	case "tcp", "tcp4", "tcp6":
 		protocol = syscall.IPPROTO_TCP
 	}
-	var uid int
+	uid := -1
 	if sdkVersion.Load() < 29 {
 		uid = platform.QuerySocketUidFromProcFs(source, target)
-	} else {
-		uid = resolveUid(th.callback, protocol, source.String(), target.String())
 	}
-	if uid < 0 {
-		return -1, ""
-	}
-	return uid, resolvePackage(th.callback, uid)
+	return resolveProcess(th.callback, protocol, source.String(), target.String(), uid)
 }
 
 var (
@@ -173,11 +155,7 @@ func installHooks() {
 				return "", process.ErrInvalidNetwork
 			}
 			// Everywhere else mihomo fills Uid from its own procfs lookup, the one Android took away.
-			uid, packageName := th.handleResolveProcess(src, dst)
-			if uid >= 0 {
-				metadata.Uid = uint32(uid)
-			}
-			return packageName, nil
+			return th.handleResolveProcess(src, dst), nil
 		}
 	})
 }
@@ -195,11 +173,10 @@ func (th *TunHandler) removeHook() {
 }
 
 var (
-	tunLock           sync.Mutex
-	errBlocked        = errors.New("blocked: the process is out of file descriptors")
-	errTunNotReady    = errors.New("blocked: the tun listener is not ready")
-	errProtectRefused = errors.New("blocked: VpnService.protect refused the socket")
-	tunHandler        *TunHandler
+	tunLock        sync.Mutex
+	errBlocked     = errors.New("blocked: the process is out of file descriptors")
+	errTunNotReady = errors.New("blocked: the tun listener is not ready")
+	tunHandler     *TunHandler
 )
 
 func handleStopTun() {
@@ -277,8 +254,8 @@ func init() {
 	}))
 }
 
-//export invokeMethod
-func invokeMethod(callback unsafe.Pointer, paramsChar *C.char) {
+//export invokeAction
+func invokeAction(callback unsafe.Pointer, paramsChar *C.char) {
 	params := takeCString(paramsChar)
 	call := &MethodCall{}
 	if err := json.Unmarshal([]byte(params), call); err != nil {

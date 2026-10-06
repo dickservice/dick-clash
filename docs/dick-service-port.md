@@ -126,6 +126,27 @@ This document now records the current workdir
   a different telemetry policy, so no Firebase dependency or resource change is
   made from static APK evidence alone.
 
+### Android core callback ABI (`android/core`, `core`)
+
+- APK smali gives the native `Core` contract: `startTun(...)` returns `Unit`,
+  the action entry is named `invokeAction`, and `TunInterface` exposes
+  `protect(Int): Unit` plus
+  `resolverProcess(protocol, source, target, uid): String`.
+- The decoded APK `VpnService` invokes `resolverProcess` with the procfs UID on
+  pre-Q Android and resolves the connection owner through
+  `ConnectivityManager` on Q and later. Its address adapter uses
+  `URL("https://$address")` before constructing `InetSocketAddress`.
+- The fork had drifted to a different JNI/Go ABI (`invokeMethod`, Boolean
+  `startTun`, `protect(): Boolean`, and separate UID/package callbacks). This
+  was a real compatibility risk, not a naming-only difference: the JNI method
+  descriptors and native callback function signatures differed. The fork now
+  matches the APK contract across Kotlin, JNI C++, C bridge, Go callback code,
+  and `VpnService`, while retaining the fork's independently tested TUN
+  locking and callback-release protections.
+- This is a static ABI restoration. No Android device or Dick APK/fork
+  end-to-end traffic comparison is available, so exact native core behavior,
+  callback timing, and platform-specific socket ownership remain unverified.
+
 ### API and models (`lib/common/dick_service_api.dart`, `lib/common/dick_service_models.dart`)
 
 - Base URL: `https://airport.dicksupport.top`.

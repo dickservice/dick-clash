@@ -1,7 +1,6 @@
 package com.follow.clash.service
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.ProxyInfo
 import android.os.Binder
@@ -20,7 +19,6 @@ import com.follow.clash.service.models.getIpv6RouteAddress
 import com.follow.clash.service.models.toCIDR
 import com.follow.clash.service.modules.ServiceModules
 import java.net.InetSocketAddress
-import java.util.concurrent.ConcurrentHashMap
 import android.net.VpnService as SystemVpnService
 
 class VpnService : SystemVpnService(), ManagedService {
@@ -40,28 +38,24 @@ class VpnService : SystemVpnService(), ManagedService {
     private val connectivity by lazy {
         getSystemService<ConnectivityManager>()
     }
-    private val uidPackageNameMap = ConcurrentHashMap<Int, String>()
+    private val uidPackageNameMap = mutableMapOf<Int, String>()
 
-    private fun resolveUid(
+    private fun resolverProcess(
         protocol: Int,
         source: InetSocketAddress,
         target: InetSocketAddress,
-    ): Int {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return -1
+        uid: Int,
+    ): String {
+        val nextUid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            connectivity?.getConnectionOwnerUid(protocol, source, target) ?: -1
+        } else {
+            uid
         }
-        return connectivity?.getConnectionOwnerUid(protocol, source, target) ?: -1
-    }
-
-    private fun resolvePackage(uid: Int): String {
-        val cached = uidPackageNameMap[uid]
-        if (cached != null) return cached
-        val packageName = packageManager
-            .getPackagesForUid(uid)
-            ?.firstOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            .orEmpty()
-        return uidPackageNameMap.putIfAbsent(uid, packageName) ?: packageName
+        if (nextUid == -1) return ""
+        if (!uidPackageNameMap.containsKey(nextUid)) {
+            uidPackageNameMap[nextUid] = packageManager.getPackagesForUid(nextUid)?.first() ?: ""
+        }
+        return uidPackageNameMap[nextUid] ?: ""
     }
 
     private val VpnOptions.tunAddress
@@ -146,22 +140,14 @@ class VpnService : SystemVpnService(), ManagedService {
         synchronized(tunLock) {
             tunRunning = true
             try {
-                // A Core that fails to take the descriptor leaves the system
-                // routes pointing at an interface nothing reads, and it no
-                // longer keeps its own sockets out of them: every connection
-                // then hangs until it times out. Tear the VPN down instead of
-                // reporting a start that only looks successful.
-                check(
-                    Core.startTun(
-                        fd = fd,
-                        protect = this::protect,
-                        resolveUid = this::resolveUid,
-                        resolvePackage = this::resolvePackage,
-                        stack = options.stack,
-                        address = options.tunAddress,
-                        dns = options.tunDns,
-                    ),
-                ) { "Core rejected the tun file descriptor" }
+                Core.startTun(
+                    fd = fd,
+                    protect = this::protect,
+                    resolverProcess = this::resolverProcess,
+                    stack = options.stack,
+                    address = options.tunAddress,
+                    dns = options.tunDns,
+                )
             } catch (error: Exception) {
                 stopTunLocked()
                 throw error
@@ -238,14 +224,6 @@ class VpnService : SystemVpnService(), ManagedService {
         }
     }
 
-    // A selected package that was uninstalled since must not veto the whole tunnel.
-    private fun addApplication(name: String, add: (String) -> Builder) {
-        try {
-            add(name)
-        } catch (_: PackageManager.NameNotFoundException) {
-            GlobalState.log("Access control skipped an uninstalled package: $name")
-        }
-    }
 
     override fun start() {
         try {
