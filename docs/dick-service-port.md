@@ -172,6 +172,9 @@ This document now records the current workdir
 - Purchase submission has the APK's early busy-state return, preventing a
   second tap from creating another order while the first request is running
   (`0x91ef40..0x91ef50`).
+- Ticket creation has the same AOT submit-state guard: repeated submission
+  while the request is active returns before reading or sending the form
+  (`0x921478..0x921488`).
 - Order-card payment and cancellation actions use expanded controls that fill
   the available action row, matching the APK's `Expanded` wrappers around the
   `继续支付` and `取消支付` buttons (`0xab23ec..0xab2410`,

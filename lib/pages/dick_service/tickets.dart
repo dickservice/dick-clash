@@ -150,6 +150,9 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
   }
 
   Future<void> _submit() async {
+    // Match the AOT submit guard: a second invocation while submitting is a
+    // no-op even if it arrives before the button rebuilds.
+    if (_busy) return;
     final subject = _subject.text.trim();
     final message = _message.text.trim();
     if (subject.isEmpty || message.isEmpty) {
