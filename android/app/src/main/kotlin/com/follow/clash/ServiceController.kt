@@ -60,6 +60,8 @@ object ServiceController {
     }
 
     fun setEventListener(callback: ((String?) -> Unit)?): Result<Unit> = runCatching {
+        // Dick's RemoteService.n(...) logs whether the listener is being removed.
+        GlobalState.log("RemoveEventListener ${callback == null}")
         Core.updateEventListener(callback)
     }
 

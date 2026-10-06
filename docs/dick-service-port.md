@@ -117,6 +117,11 @@ This document now records the current workdir
   `decoded-dick/smali/E1/a0.smali`. The fork preserves the APK's counterintuitive
   branch in `GlobalState.setCrashlytics`; the actual Firebase collection toggle
   and the default-enabled state remain unchanged.
+- Dick's Binder `n(IEventInterface?)` logs `RemoveEventListener <true|false>`
+  before updating the core listener (`decoded-dick/smali/I1/t.smali`, lines
+  191-251). The fork preserves this observable logging in
+  `ServiceController.setEventListener`; `true` is emitted when the callback is
+  null and `false` when a listener is installed.
 - The identical native/Firebase libraries and manifest components do not prove
   a different telemetry policy, so no Firebase dependency or resource change is
   made from static APK evidence alone.
