@@ -15,7 +15,12 @@ const coreManifestName = 'manifest.json';
 const coreName = 'clash.meta';
 const browserUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const packageName = 'org.dickservice.client';
+// Android MethodChannel base. It stays `com.follow.clash` even though the
+// installed application id is `org.dickservice.client`: the Kotlin
+// `Components.PACKAGE_NAME` and the original AOT both use this string, so the
+// Dart side has to match it or every `app`/`service`/`tile` call fails with a
+// MissingPluginException.
+const packageName = 'com.follow.clash';
 final unixSocketPath = '/tmp/FlClashSocket_${Random().nextInt(10000)}.sock';
 final windowsPipeName = '\\\\.\\pipe\\FlClashCore_${_randomPipeId()}';
 const helperPort = 47890;
