@@ -192,8 +192,20 @@ func TestReclaimEntryVerifiesTheInodeItChowns(t *testing.T) {
 	if err := os.WriteFile(plain, []byte("proxies: []\n"), 0o600); err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	if _, err := reclaimEntry(reclaimTargetFor(t, plain), foreign, gid); err == nil {
-		t.Error("a foreign-owned regular file must reach fchown, which only root may complete")
+	ok, err := reclaimEntry(reclaimTargetFor(t, plain), foreign, gid)
+	if uid == 0 {
+		if !ok || err != nil {
+			t.Fatalf("reclaimEntry = (%v, %v), want root to complete fchown", ok, err)
+		}
+		info, err := os.Lstat(plain)
+		if err != nil {
+			t.Fatalf("lstat error: %v", err)
+		}
+		if owner := int(info.Sys().(*syscall.Stat_t).Uid); owner != foreign {
+			t.Errorf("owner = %d, want %d", owner, foreign)
+		}
+	} else if ok || err == nil {
+		t.Errorf("reclaimEntry = (%v, %v), want fchown denied for non-root", ok, err)
 	}
 }
 

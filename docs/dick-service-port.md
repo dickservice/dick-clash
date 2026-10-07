@@ -13,7 +13,41 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete native/device behavior. Those items remain explicitly
 unimplemented or marked unknown rather than guessed.
 
-## Integrated audit checkpoint (dab78a2)
+## Integrated audit checkpoint (04f9226 + regression closure)
+
+The source checkpoint `04f9226` includes the `dab78a2..04f9226` model/API,
+expiry lifecycle, payment/purchase/ticket, Android logging, and cross-language
+core callback ABI corrections described below. Historical audit reports are
+snapshots of earlier worktrees, not a current list of unfixed defects.
+
+Regression closure on 2026-10-07 additionally aligns Linux protocol, user-agent,
+and Android notification tests with Dick branding; decodes request paths in
+the local WebDAV test origin (the branded collection contains a space); teaches
+the dead-file lint to recognize public top-level entry functions, with a
+regression test; and tests ownership reclamation correctly for both root and
+non-root callers. These are test/harness changes, not new app behavior.
+
+Verified in this workspace with Flutter 3.47.1 / Dart 3.13.1:
+
+- Focused API/cache/script tests: **24 passed**.
+- Full Flutter suite: **1,875 passed, 3 skipped, 0 failed**.
+- `flutter analyze --no-pub`: **No issues found**.
+- `go test ./...`: **passed** for `core` (platform has no tests).
+- Android app/common/service unit tests: **111 passed** (58/30/23), all
+  tasks rerun offline; Gradle reported `BUILD SUCCESSFUL`.
+- Both native asset hooks restored to `true`; no `pubspec.yaml` diff.
+- Rule asset: **55,840 bytes**, SHA-256
+  `d2b761ac9b854c16fe4df2108e1c34c3fd889d7a55c867a306227de8aa0df55c`.
+- Formatter and `git diff --check` pass. Detailed command outputs are retained
+  under the workspace's `work/flclash-diff/verification/` directory.
+
+This checkpoint does not establish release/device parity: `adb devices` found
+no connected device, the release keystore is absent, and the exact Dick native
+core revision plus dirty-source diff remains unavailable. Do not invent
+pagination, refresh tokens, payment polling, offline grace, or a telemetry
+policy to fill those evidence gaps.
+
+## Previous integrated audit checkpoint (dab78a2)
 
 The verified page/lifecycle parity batch was committed and pushed as `a979e7c`
 (`fix: align Dick Service pages and lifecycle with APK`). The exact AOT logout
@@ -186,7 +220,8 @@ This document now records the current workdir
 - User-order identifiers fall back through `trade_no`, `tradeNo`, and `id`;
   plan names fall back through `plan_name`, `planName`, and nested
   `plan.name` (`0x90dc84..0x90e02c`). Ticket cards use `updated_at`, matching
-  the sole timestamp stored in the APK ticket object (`0x9209a4..0x920acc`).
+  APK ticket object's selected timestamp (`0x9209a4..0x920acc`), with
+  `created_at` as the fallback when `updated_at` is absent.
 - Gift-card `rewards` and `invite_rewards` are maps, not lists. The APK drops
   entries with null/empty values and formats each as `key: value`, preserving
   the message, optional template name, and invitation prefix
@@ -278,10 +313,10 @@ This document now records the current workdir
   (`0x6b49d200`/`0x973a88`) are represented.
 - Expiry cache keys, millisecond local timestamps, 60-second rollback lock
   (`60000` ms), signature validation, missing/tampered-cache handling, and
-  bootstrap auth dependency are represented.
-- Traffic warning threshold is `< 0.1` (`0x88cbe4`/`0x88cc68`). The exact
-  renewal window (`0x88cd38`), offline grace, and core-stop behavior remain
-  unknown.
+  bootstrap bound-profile/auth boundaries are represented.
+- Traffic warning threshold is `< 0.1` (`0x88cbe4`/`0x88cc68`). Renewal
+  uses a non-negative remaining duration with `inDays <= 3` (`0x88cd38`).
+  Offline grace and core-stop behavior remain unverified.
 - Logout clears auth, alert, bootstrap, and expiry state. AOT also resolves
   the subscription URL and iterates profiles via predicate `0x8b5298`/`0x67bb44`;
   the fork resolves that URL and removes every profile whose URL exactly
