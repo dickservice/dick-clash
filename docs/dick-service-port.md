@@ -13,6 +13,59 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete native/device behavior. Those items remain explicitly
 unimplemented or marked unknown rather than guessed.
 
+## Release-signed emulator checkpoint (f37f8ff)
+
+A self-generated PKCS12 release key now signs the release build, so the
+artifacts are genuine `release` (v2-signed, `applicationId org.dickservice.client`,
+no `.dev` suffix) rather than debug-signed. The keystore and its passwords live
+in gitignored `android/app/keystore.jks` and `android/local.properties`; they are
+not committed and must not be.
+
+Emulator functional testing surfaced a real branding-port defect: the Dart
+`packageName` constant (Android MethodChannel base) had been changed to
+`org.dickservice.client`, while the Kotlin `Components.PACKAGE_NAME` and the
+original Dick AOT both use `com.follow.clash`. The release build therefore
+failed `service`/`app`/`tile` channel calls with `MissingPluginException`
+(`Core.init`, `getLastExitInfo`, `updateExcludeFromRecents`). Fixing the
+constant to `com.follow.clash` removed every channel error; a lint test
+(`test/lint/android_channel_test.dart`) now pins the Dart base to the Kotlin
+`PACKAGE_NAME`.
+
+Verified on 2026-10-07:
+
+- Full Flutter suite after the channel fix: **1,893 passed, 3 skipped, 0 failed**.
+- `flutter analyze --no-pub`: **No issues found**.
+- Release APK build: **successful** for `android-arm64` and `android-x64`.
+- Built `libapp.so` channel base confirmed `com.follow.clash/{service,app,tile}`.
+- On `emulator-5554` the release APK installed, launched, walked Disclaimer and
+  the Firebase notice, and reached the login screen with **no**
+  `MissingPluginException`; the emitted package is `org.dickservice.client`.
+- In-place install over the original APK fails with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (correct: only the original private key
+  could update it).
+
+Release artifact hashes (self-signed):
+
+- `app-arm64-v8a-release.apk` SHA-256
+  `87dd4ec805de4eaf3c7679e6ab7b97c2c01064f56cdf16290e738d963da07741`.
+- `app-x86_64-release.apk` SHA-256
+  `9203ec096144b4f61dd831f4d9be95dbd55e38197bfbfb2ee9c9826652fcf4b0`.
+
+Still not established, and not claimable from this evidence:
+
+- **Original signature.** The Dick certificate is `SHA-256 8b65aee3…`; the
+  self-signed release is `0bd4400e…`. Only the original private key (CI
+  `KEYSTORE`/`KEY_ALIAS`/`STORE_PASSWORD`) can produce an upgrade-compatible
+  artifact or a byte-identical signature. A private key cannot be recovered
+  from the published certificate.
+- **Exact Dick core rebuild.** The embedded core reports
+  `v0.8.94-0.20260705130944-5b6138390317+dirty`; revision `5b613839` is not
+  present in the mihomo upstream or the local release mirror, and the `dirty`
+  source diff was never published, so the binary cannot be reproduced exactly.
+- **Physical-device acceptance.** Only `emulator-5554` is available. Real TUN
+  routing, Always-on VPN, system revoke, and live payment callbacks still need a
+  physical device.
+
 ## Integrated audit checkpoint (lifecycle/native closure)
 
 The source checkpoint now includes the regression closure at `6c059a8` plus
