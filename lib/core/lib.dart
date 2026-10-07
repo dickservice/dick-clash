@@ -17,6 +17,11 @@ class CoreLib extends CoreHandlerInterface {
 
   Completer<bool> _connectedCompleter = Completer<bool>();
   Future<CoreLifecycleResult>? _closeOperation;
+  Future<CoreLifecycleResult>? _startOperation;
+  Future<void> _operationTail = Future<void>.value();
+  int _connectionGeneration = 0;
+  int? _startGeneration;
+  bool _initialized = false;
   int _lifecycleRevision = 0;
   int _methodCallId = 0;
   bool _closed = false;
@@ -42,26 +47,94 @@ class CoreLib extends CoreHandlerInterface {
       throw StateError('Core lifecycle is closed');
     }
     final revision = ++_lifecycleRevision;
+    final generation = _connectionGeneration;
+    final pending = _startOperation;
+    if (pending != null && _startGeneration == generation) {
+      final result = await pending;
+      return CoreLifecycleResult(
+        revision: revision,
+        outcome:
+            !_isCurrent(generation) ||
+                result.outcome == CoreLifecycleOutcome.superseded
+            ? CoreLifecycleOutcome.superseded
+            : CoreLifecycleOutcome.coalesced,
+      );
+    }
     if (_connectedCompleter.isCompleted) {
       return CoreLifecycleResult(
         revision: revision,
         outcome: CoreLifecycleOutcome.coalesced,
       );
     }
-    final initializationError = await _service?.init() ?? '';
-    if (initializationError.isNotEmpty) {
-      throw StateError(initializationError);
+    final connection = _connectedCompleter;
+    final operation = _serialize(
+      () => _start(revision, generation, connection),
+    );
+    _startOperation = operation;
+    _startGeneration = generation;
+    try {
+      return await operation;
+    } finally {
+      if (identical(_startOperation, operation)) {
+        _startOperation = null;
+        _startGeneration = null;
+      }
     }
-    _connectedCompleter.complete(true);
-    final syncError =
-        await _service?.syncState(
-          globalState.container.read(sharedStateProvider),
-        ) ??
-        '';
-    if (syncError.isNotEmpty) {
-      _connectedCompleter = Completer<bool>();
-      await _service?.shutdown();
-      throw StateError(syncError);
+  }
+
+  bool _isCurrent(int generation) =>
+      !_closed && generation == _connectionGeneration;
+
+  CoreLifecycleResult _superseded(int revision) => CoreLifecycleResult(
+    revision: revision,
+    outcome: CoreLifecycleOutcome.superseded,
+  );
+
+  Future<T> _serialize<T>(Future<T> Function() action) {
+    final operation = _operationTail.then((_) => action());
+    _operationTail = operation.then<void>((_) {}, onError: (Object _) {});
+    return operation;
+  }
+
+  Future<CoreLifecycleResult> _start(
+    int revision,
+    int generation,
+    Completer<bool> connection,
+  ) async {
+    if (!_isCurrent(generation)) {
+      return _superseded(revision);
+    }
+    try {
+      final initializationError = await _service?.init() ?? '';
+      if (initializationError.isEmpty) {
+        _initialized = true;
+      }
+      if (!_isCurrent(generation)) {
+        return _superseded(revision);
+      }
+      if (initializationError.isNotEmpty) {
+        throw StateError(initializationError);
+      }
+      connection.complete(true);
+      final syncError =
+          await _service?.syncState(
+            globalState.container.read(sharedStateProvider),
+          ) ??
+          '';
+      if (!_isCurrent(generation)) {
+        return _superseded(revision);
+      }
+      if (syncError.isNotEmpty) {
+        _connectedCompleter = Completer<bool>();
+        _initialized = false;
+        await _service?.shutdown();
+        throw StateError(syncError);
+      }
+    } catch (_) {
+      if (!_isCurrent(generation)) {
+        return _superseded(revision);
+      }
+      rethrow;
     }
     return CoreLifecycleResult(
       revision: revision,
@@ -71,7 +144,10 @@ class CoreLib extends CoreHandlerInterface {
 
   @override
   Future<CoreLifecycleResult> restart() async {
-    await stop();
+    final result = await stop();
+    if (_closed || result.outcome == CoreLifecycleOutcome.superseded) {
+      return _superseded(result.revision);
+    }
     return start();
   }
 
@@ -83,21 +159,34 @@ class CoreLib extends CoreHandlerInterface {
       throw StateError('Core lifecycle is closed');
     }
     final revision = ++_lifecycleRevision;
-    if (!_connectedCompleter.isCompleted) {
+    final generation = ++_connectionGeneration;
+    final connection = _connectedCompleter;
+    _connectedCompleter = Completer<bool>();
+    if (!connection.isCompleted) {
+      connection.complete(false);
+    }
+    return _serialize(() async {
+      if (!_initialized) {
+        return CoreLifecycleResult(
+          revision: revision,
+          outcome: generation == _connectionGeneration
+              ? CoreLifecycleOutcome.coalesced
+              : CoreLifecycleOutcome.superseded,
+        );
+      }
+      _initialized = false;
+      final stopped = await _service?.shutdown() ?? true;
+      if (generation != _connectionGeneration) {
+        return _superseded(revision);
+      }
+      if (!stopped) {
+        throw StateError('Android Core service shutdown failed');
+      }
       return CoreLifecycleResult(
         revision: revision,
-        outcome: CoreLifecycleOutcome.coalesced,
+        outcome: CoreLifecycleOutcome.applied,
       );
-    }
-    _connectedCompleter = Completer<bool>();
-    final stopped = await _service?.shutdown() ?? true;
-    if (!stopped) {
-      throw StateError('Android Core service shutdown failed');
-    }
-    return CoreLifecycleResult(
-      revision: revision,
-      outcome: CoreLifecycleOutcome.applied,
-    );
+    });
   }
 
   @override
@@ -140,8 +229,19 @@ class CoreLib extends CoreHandlerInterface {
     required CoreMethod method,
     Object? arguments,
   }) async {
+    if (_closed) {
+      return null;
+    }
+    final connection = _connectedCompleter;
     try {
-      await _connectedCompleter.future.timeout(coreConnectionWaitDuration);
+      final connected = await connection.future.timeout(
+        coreConnectionWaitDuration,
+      );
+      if (!connected ||
+          _closed ||
+          !identical(connection, _connectedCompleter)) {
+        return null;
+      }
     } catch (error) {
       commonPrint.log(
         'Invoke method ${method.name} before connection timed out: $error',

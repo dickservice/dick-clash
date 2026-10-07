@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/lib.dart';
 import 'package:fl_clash/core/method.dart';
@@ -17,6 +19,12 @@ class _FakeService implements Service {
 
   final calls = <String>[];
 
+  Completer<String>? pendingInit;
+  Completer<String>? pendingSync;
+  Completer<bool>? pendingShutdown;
+  final syncStarted = Completer<void>();
+  final shutdownStarted = Completer<void>();
+
   String initError = '';
   String syncError = '';
   bool shutdownResult = true;
@@ -29,19 +37,25 @@ class _FakeService implements Service {
   @override
   Future<String> init() async {
     calls.add('init');
-    return initError;
+    return await pendingInit?.future ?? initError;
   }
 
   @override
   Future<String> syncState(SharedState state) async {
     calls.add('syncState');
-    return syncError;
+    if (!syncStarted.isCompleted) {
+      syncStarted.complete();
+    }
+    return await pendingSync?.future ?? syncError;
   }
 
   @override
   Future<bool> shutdown() async {
     calls.add('shutdown');
-    return shutdownResult;
+    if (!shutdownStarted.isCompleted) {
+      shutdownStarted.complete();
+    }
+    return await pendingShutdown?.future ?? shutdownResult;
   }
 
   @override
@@ -115,6 +129,68 @@ void main() {
       expect(service.calls, isEmpty);
     });
 
+    test('coalesces starts pending initialization', () async {
+      service.pendingInit = Completer<String>();
+      final first = lib.start();
+      final second = lib.start();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.calls, ['init']);
+      service.pendingInit!.complete('');
+      final results = await Future.wait([first, second]);
+
+      expect(results.map((result) => result.revision), [1, 2]);
+      expect(results.map((result) => result.outcome), [
+        CoreLifecycleOutcome.applied,
+        CoreLifecycleOutcome.coalesced,
+      ]);
+      expect(service.calls, ['init', 'syncState']);
+    });
+
+    test('coalesces starts until shared state sync finishes', () async {
+      service.pendingSync = Completer<String>();
+      final first = lib.start();
+      await service.syncStarted.future;
+      var completed = false;
+      final second = lib.start().then((result) {
+        completed = true;
+        return result;
+      });
+      await Future<void>.delayed(Duration.zero);
+      expect(completed, isFalse);
+
+      service.pendingSync!.complete('');
+      expect((await first).outcome, CoreLifecycleOutcome.applied);
+      expect((await second).outcome, CoreLifecycleOutcome.coalesced);
+      expect(service.calls, ['init', 'syncState']);
+    });
+
+    test('pending starts share failure and can retry', () async {
+      service.pendingInit = Completer<String>();
+      final first = expectLater(lib.start(), throwsA(isA<StateError>()));
+      final second = expectLater(lib.start(), throwsA(isA<StateError>()));
+      await Future<void>.delayed(Duration.zero);
+      service.pendingInit!.complete('init boom');
+      await Future.wait([first, second]);
+      expect(service.calls, ['init']);
+
+      service.pendingInit = null;
+      expect((await lib.start()).outcome, CoreLifecycleOutcome.applied);
+    });
+
+    test('pending sync callers share failure and cleanup', () async {
+      service.pendingSync = Completer<String>();
+      final first = expectLater(lib.start(), throwsA(isA<StateError>()));
+      await service.syncStarted.future;
+      final second = expectLater(lib.start(), throwsA(isA<StateError>()));
+      service.pendingSync!.complete('sync boom');
+      await Future.wait([first, second]);
+      expect(service.calls, ['init', 'syncState', 'shutdown']);
+
+      service.pendingSync = null;
+      expect((await lib.start()).outcome, CoreLifecycleOutcome.applied);
+    });
+
     test('an initialization error leaves the handler unconnected', () async {
       service.initError = 'init boom';
 
@@ -169,6 +245,52 @@ void main() {
       expect(service.calls, ['shutdown']);
     });
 
+    test(
+      'invalidates pending init and serializes a replacement start',
+      () async {
+        service.pendingInit = Completer<String>();
+        final first = lib.start();
+        await Future<void>.delayed(Duration.zero);
+        final stopped = lib.stop();
+        final replacement = lib.start();
+        expect(service.calls, ['init']);
+
+        service.pendingInit!.complete('');
+        expect((await first).outcome, CoreLifecycleOutcome.superseded);
+        expect((await stopped).outcome, CoreLifecycleOutcome.applied);
+        expect((await replacement).outcome, CoreLifecycleOutcome.applied);
+        expect(service.calls, ['init', 'shutdown', 'init', 'syncState']);
+      },
+    );
+
+    test('a start waits for an in-flight shutdown', () async {
+      await lib.start();
+      service.calls.clear();
+      service.pendingShutdown = Completer<bool>();
+      final stopped = lib.stop();
+      await service.shutdownStarted.future;
+      final started = lib.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(service.calls, ['shutdown']);
+
+      service.pendingShutdown!.complete(true);
+      expect((await stopped).outcome, CoreLifecycleOutcome.applied);
+      expect((await started).outcome, CoreLifecycleOutcome.applied);
+      expect(service.calls, ['shutdown', 'init', 'syncState']);
+    });
+
+    test('supersedes delayed sync without duplicate error cleanup', () async {
+      service.pendingSync = Completer<String>();
+      final started = lib.start();
+      await service.syncStarted.future;
+      final stopped = lib.stop();
+      service.pendingSync!.complete('obsolete sync error');
+
+      expect((await started).outcome, CoreLifecycleOutcome.superseded);
+      expect((await stopped).outcome, CoreLifecycleOutcome.applied);
+      expect(service.calls, ['init', 'syncState', 'shutdown']);
+    });
+
     test('a failed shutdown throws but still closes the gate', () async {
       await lib.start();
       service.shutdownResult = false;
@@ -200,6 +322,82 @@ void main() {
 
       await expectLater(lib.start(), throwsA(isA<StateError>()));
       await expectLater(lib.stop(), throwsA(isA<StateError>()));
+    });
+
+    test('prevents queued initialization after immediate close', () async {
+      final started = lib.start();
+      final closed = lib.close();
+
+      expect((await started).outcome, CoreLifecycleOutcome.superseded);
+      expect((await closed).outcome, CoreLifecycleOutcome.coalesced);
+      expect(service.calls, isEmpty);
+    });
+
+    test('invalidates delayed init and all coalesced starts', () async {
+      service.pendingInit = Completer<String>();
+      final first = lib.start();
+      final second = lib.start();
+      await Future<void>.delayed(Duration.zero);
+      final closed = lib.close();
+      service.pendingInit!.complete('');
+
+      expect((await first).outcome, CoreLifecycleOutcome.superseded);
+      expect((await second).outcome, CoreLifecycleOutcome.superseded);
+      expect((await closed).outcome, CoreLifecycleOutcome.applied);
+      expect(service.calls, ['init', 'shutdown']);
+      await expectLater(lib.start(), throwsA(isA<StateError>()));
+    });
+
+    for (final syncError in ['', 'late sync failure']) {
+      test('invalidates delayed sync result "$syncError"', () async {
+        service.pendingSync = Completer<String>();
+        final started = lib.start();
+        await service.syncStarted.future;
+        final closed = lib.close();
+        service.pendingSync!.complete(syncError);
+
+        expect((await started).outcome, CoreLifecycleOutcome.superseded);
+        expect((await closed).outcome, CoreLifecycleOutcome.applied);
+        expect(service.calls, ['init', 'syncState', 'shutdown']);
+        expect(
+          await lib.invokeMethod<String>(method: CoreMethod.getProxies),
+          isNull,
+        );
+      });
+    }
+
+    test('a late init error cannot override close', () async {
+      service.pendingInit = Completer<String>();
+      final started = lib.start();
+      await Future<void>.delayed(Duration.zero);
+      final closed = lib.close();
+      service.pendingInit!.complete('late init failure');
+
+      expect((await started).outcome, CoreLifecycleOutcome.superseded);
+      expect((await closed).outcome, CoreLifecycleOutcome.coalesced);
+      expect(service.calls, ['init']);
+    });
+
+    test('close supersedes restart waiting for shutdown', () async {
+      await lib.start();
+      service.calls.clear();
+      service.pendingShutdown = Completer<bool>();
+      final restarted = lib.restart();
+      await service.shutdownStarted.future;
+      final closed = lib.close();
+      service.pendingShutdown!.complete(true);
+
+      expect((await restarted).outcome, CoreLifecycleOutcome.superseded);
+      await closed;
+      expect(service.calls, ['shutdown']);
+    });
+
+    test('releases method calls waiting for a connection', () async {
+      final pending = lib.invokeMethod<String>(method: CoreMethod.getProxies);
+      await lib.close();
+
+      expect(await pending, isNull);
+      expect(service.calls, isEmpty);
     });
 
     test('runs the shutdown once no matter how often it is called', () async {

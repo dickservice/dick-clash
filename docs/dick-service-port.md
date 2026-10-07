@@ -13,6 +13,41 @@ callback/polling, offline grace, exact core behavior, Firebase telemetry
 behavior, or the complete native/device behavior. Those items remain explicitly
 unimplemented or marked unknown rather than guessed.
 
+## Integrated audit checkpoint (lifecycle/native closure)
+
+The source checkpoint now includes the regression closure at `6c059a8` plus
+Android lifecycle/native fixes currently being validated. `CoreLib` serializes
+start/stop work, coalesces concurrent starts, invalidates delayed continuations
+after stop/close, and keeps connection waiters tied to their operation. Android
+JNI now raises `IllegalStateException` when native TUN startup returns false,
+so a failed native start cannot be reported as a successful VPN startup.
+`ApplicationState.dispose()` is synchronous, captures provider-owned shutdown
+closures before unmount, calls `super.dispose()` synchronously, and preserves
+Core-close then exit ordering even when either operation fails.
+
+Verified on 2026-10-07:
+
+- Core/lifecycle and disposal focused tests: **30 passed**.
+- Full Flutter suite after the lifecycle changes: **1,891 passed, 3 skipped,
+  0 failed**.
+- `flutter analyze --no-pub`: **No issues found**.
+- JNI TUN success/failure injection test: **passed**.
+- Release APK build with both native asset hooks enabled: **successful** for
+  `android-arm64` and `android-x64`; artifacts are test-signed `.dev` packages.
+- x86_64 test APK installed and launched on `emulator-5554`; process remained
+  alive and no fatal Android exception or native-link error was observed.
+
+Artifact hashes:
+
+- `app-arm64-v8a-release.apk` SHA-256
+  `09374ddd21673eab4e1b1ae71406ed27cda637c74e44daae0ca0b3e2ec59d599`.
+- `app-x86_64-release.apk` SHA-256
+  `23ef3974d8a01696d822f65f08df3c12bde39a2c72d1a628d8f5baebda7c8321`.
+
+This remains a test-signed emulator validation, not original-signature or
+physical-device acceptance. The original release keystore, exact Dick core
+dirty-source diff, and reconstructed original FlClash AOT remain unavailable.
+
 ## Integrated audit checkpoint (04f9226 + regression closure)
 
 The source checkpoint `04f9226` includes the `dab78a2..04f9226` model/API,

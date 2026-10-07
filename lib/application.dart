@@ -6,6 +6,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/window.dart';
 import 'package:fl_clash/bootstrap.dart';
 import 'package:fl_clash/common/system_dns.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/manager/hotkey_manager.dart';
 import 'package:fl_clash/manager/manager.dart';
@@ -59,6 +60,15 @@ class Application extends ConsumerStatefulWidget {
 class ApplicationState extends ConsumerState<Application> {
   Timer? _autoUpdateProfilesTaskTimer;
   bool _preHasVpn = false;
+  late Future<void> Function() _closeCore;
+  late Future<void> Function() _handleExit;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _closeCore = ref.read(coreHandlerProvider).close;
+    _handleExit = ref.read(systemActionProvider.notifier).handleExit;
+  }
 
   final _pageTransitionsTheme = const PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{
@@ -196,12 +206,33 @@ class ApplicationState extends ConsumerState<Application> {
     );
   }
 
+  Future<void> _shutdown(
+    Future<void> Function() closeCore,
+    Future<void> Function() handleExit,
+  ) async {
+    try {
+      await closeCore();
+    } catch (error) {
+      commonPrint.log(
+        'Application core close failed: ${compactError(error)}',
+        logLevel: LogLevel.error,
+      );
+    }
+    try {
+      await handleExit();
+    } catch (error) {
+      commonPrint.log(
+        'Application exit failed: ${compactError(error)}',
+        logLevel: LogLevel.error,
+      );
+    }
+  }
+
   @override
-  Future<void> dispose() async {
+  void dispose() {
     linkManager.destroy();
     _autoUpdateProfilesTaskTimer?.cancel();
-    await ref.read(coreHandlerProvider).close();
-    await ref.read(systemActionProvider.notifier).handleExit();
+    unawaited(_shutdown(_closeCore, _handleExit));
     super.dispose();
   }
 }
